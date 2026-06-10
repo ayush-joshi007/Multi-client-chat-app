@@ -10,7 +10,6 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @Builder
 public class MessageDto {
-
     private String content;
-
+    private Long senderId;
 }
