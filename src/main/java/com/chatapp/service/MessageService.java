@@ -22,9 +22,16 @@ public class MessageService {
     private final ModelMapper modelMapper;
 
     public MessageDto sendMessage(MessageDto messageDto){
+
+        String userName = messageDto.getUserName();//TEMPORARY SENDER NAME
+
         MessageEntity messageEntity = messageMapper.mapFrom(messageDto);
         MessageEntity savedMessageEntity =  messageRepository.save(messageEntity);
-        return messageMapper.mapTo(savedMessageEntity);
+        MessageDto responseDto = messageMapper.mapTo(savedMessageEntity);
+
+        responseDto.setUserName(userName); //TEMPORARY SENDER NAME
+
+        return responseDto;
     }
 
     public List<MessageDto> getHistory() {

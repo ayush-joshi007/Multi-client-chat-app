@@ -12,4 +12,10 @@ import lombok.NoArgsConstructor;
 public class MessageDto {
     private String content;
     private Long senderId;
+
+
+    private String userName; //TEMPORARY SENDER NAME
+
+
+
 }

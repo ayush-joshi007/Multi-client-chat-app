@@ -1,0 +1,33 @@
+#messages{
+    height: 600px;
+    width: 800px;
+    overflow-y: scroll;
+    border: 1px solid;
+    text-align: center;
+    overflow-wrap: break-word;
+}
+
+#left{
+    width: 500px;
+}
+
+#right{
+    width: 500px;
+}
+
+#layout{
+    display: flex;
+}
+
+#inputDiv{
+    text-align: center;
+    margin-top: 20px;
+}
+
+#message{
+    width: 700px;
+}
+
+.message{
+    margin-bottom: 10px;
+}
