@@ -31,3 +31,24 @@
 .message{
     margin-bottom: 10px;
 }
+
+#register-box {
+    border: 5px solid black;
+    padding: 20px;
+    width: 400px;
+    height: 500px;
+    text-align: center;
+}
+
+body {
+    margin: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+}
+
+#responseMessage {
+    color: red;
+    font-weight: bold;
+}
