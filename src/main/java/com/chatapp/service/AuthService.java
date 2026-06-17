@@ -20,47 +20,49 @@ public class AuthService {
     private RegisterRequestMapper registerRequestMapper;
     private BCryptPasswordEncoder bCryptPasswordEncoder;
 
-    public String register(RegisterRequest registerRequest){
+    public boolean register(RegisterRequest registerRequest) {
+
         UserEntity userEntity = registerRequestMapper.mapFrom(registerRequest);
 
         String email = registerRequest.getEmail();
-        Optional<UserEntity> foundUserEmail = userRepository.findByEmail(email);
+        Optional<UserEntity> foundUserEmail =
+                userRepository.findByEmail(email);
+
         String userName = registerRequest.getUserName();
-        Optional<UserEntity> foundUserName = userRepository.findByUserName(userName);
+        Optional<UserEntity> foundUserName =
+                userRepository.findByUserName(userName);
+
         if(foundUserEmail.isPresent() || foundUserName.isPresent()){
-            return "Account Already Exists!";
-        }
-        else{
-            String password = registerRequest.getPassword();
-            String hashedPassword = bCryptPasswordEncoder.encode(password);
-            userEntity.setPassword(hashedPassword);
-            userRepository.save(userEntity);
-
-            return "Registration Successful!";
+            return false;
         }
 
+        String password = registerRequest.getPassword();
+        String hashedPassword =
+                bCryptPasswordEncoder.encode(password);
+
+        userEntity.setPassword(hashedPassword);
+
+        userRepository.save(userEntity);
+
+        return true;
     }
-    public String  login(LoginRequest loginRequest){
+    public UserEntity login(LoginRequest loginRequest){
 
         String email = loginRequest.getEmail();
         String password = loginRequest.getPassword();
+
         Optional<UserEntity> foundUserEntity = userRepository.findByEmail(email);
+
         if(foundUserEntity.isPresent()){
+
             UserEntity userEntity = foundUserEntity.get();
-            String dbPassword = userEntity.getPassword();
 
-            if(bCryptPasswordEncoder.matches(password, dbPassword)){
-                return "Login Successful!";
-            }
-            else{
-                return "Incorrect Credentials!";
+            if(bCryptPasswordEncoder.matches(password, userEntity.getPassword())){
+                return userEntity;
             }
         }
-        else{
-            return "Incorrect Credentials!";
-        }
 
-
+        return null;
     }
 
 

@@ -1,4 +1,8 @@
-const userName= prompt("Enter username: ");
+const userId = localStorage.getItem("userId");
+if(userId==null){
+    window.location.href = 'login.html';
+}
+
 const client = new StompJs.Client({
     brokerURL: 'ws://localhost:8080/ws'
 });
@@ -6,36 +10,62 @@ const client = new StompJs.Client({
 console.log("app.js loaded");
 
 function loadMessages(){
+
+    console.log("LOAD MESSAGES CALLED", new Date());
+
+    const div = document.getElementById("messages");
+    div.innerHTML = "";
+
     fetch('http://localhost:8080/messages')
         .then(response => response.json())
         .then(data =>{
             for(const msg of data){
-                const div = document.getElementById("messages");
+
                 const msgDiv = document.createElement("div");
                 msgDiv.classList.add("message");
-                msgDiv.textContent=msg.content;
+                msgDiv.textContent =
+                    msg.userName + ": " + msg.content;
+
                 div.appendChild(msgDiv);
-                div.scrollTop=div.scrollHeight;
             }
+
+            div.scrollTop = div.scrollHeight;
         })
         .catch(error => console.error('Error:', error));
 }
-loadMessages();
 
 client.onConnect = () => {
-    client.subscribe('/topic/messages', (message) => {
-         const messageData = JSON.parse(message.body);
-         const Div = document.getElementById("messages");
-         const messageDiv = document.createElement("div");
-         messageDiv.classList.add("message");
-         // Display userName + ": " + content for WebSocket messages
-         const displayText = messageData.userName ? `${messageData.userName}: ${messageData.content}` : messageData.content;
-         messageDiv.textContent = displayText;
-         Div.appendChild(messageDiv);
-         Div.scrollTop = Div.scrollHeight;
-         console.log("received!");
-     })
-     console.log("Connected!");
+
+    console.log("CONNECTED", new Date());
+
+    loadMessages();
+
+    client.subscribe('/topic/messages', function(message){
+
+        const messageData = JSON.parse(message.body);
+
+        const div = document.getElementById("messages");
+        const messageDiv = document.createElement("div");
+
+        messageDiv.classList.add("message");
+        messageDiv.textContent =
+            messageData.userName + ": " + messageData.content;
+
+        div.appendChild(messageDiv);
+        div.scrollTop = div.scrollHeight;
+
+        console.log("RECEIVED!", new Date());
+    });
+
+    console.log("Connected!");
+};
+
+client.onWebSocketClose = () => {
+    console.log("WEBSOCKET CLOSED", new Date());
+};
+
+client.onDisconnect = () => {
+    console.log("DISCONNECTED", new Date());
 };
 
 client.activate();
@@ -54,13 +84,9 @@ message.addEventListener("keydown", function (event){
 sendButton.addEventListener("click", function (){
     const messageBox = document.getElementById("message");
     const messageString={
-        'content': messageBox.value,
-
-
-        'userName': userName //TEMPORARY SENDER NAME
-
-
-
+        content: messageBox.value,
+        senderId: parseInt(localStorage.getItem("userId")),
+        userName: localStorage.getItem("userName")
     };
     const contentJson = JSON.stringify(messageString);
     client.publish({
@@ -71,5 +97,11 @@ sendButton.addEventListener("click", function (){
 
 })
 
-
 console.log(sendButton);
+
+
+const logoutBtn = document.getElementById("logoutBtn");
+logoutBtn.addEventListener("click", function (){
+    localStorage.clear();
+    window.location.href = "login.html";
+})

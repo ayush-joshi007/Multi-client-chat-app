@@ -16,15 +16,15 @@ import lombok.NoArgsConstructor;
 public class RegisterRequest {
 
     @NotBlank
-    @Size(max = 30)
+    @Size(max = 30, message = "Username cannot be longer than 30 characters!")
     private String userName;
 
-    @Email
+    @Email(message = "Invalid email format!")
     @NotBlank
     private String email;
 
     @NotBlank
-    @Size(min = 8)
+    @Size(min = 8, message = "Password must be at least 8 characters!")
     private String password;
 
 }

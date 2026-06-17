@@ -20,9 +20,13 @@ public class MessageEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    private Long senderId;
-    private Long receiverId;
+
+    @ManyToOne
+    @JoinColumn(name = "sender_id")
+    private UserEntity sender;
+
     private String content;
+
     @CreationTimestamp
     private LocalDateTime createdAt;
 }

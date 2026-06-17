@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>login</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="login-box" >
+    <p id="responseMessage"></p>
+    <div id="left"></div>
+    <div id="loginWindow">
+        <br>
+        <br>
+        <h1>LOGIN</h1>
+        <br>
+        <br>
+
+        <label for="email">Email: </label>
+        <input type="email" id="email" placeholder="Email">
+        <br>
+        <br>
+        <br>
+
+        <label for="password">Password: </label>
+        <input type="password" id="password" placeholder="Password">
+        <br>
+        <br>
+        <br>
+        <br>
+
+        <button id="loginBtn">Login</button><br><br><br>
+        <span>Don't have an account? </span>
+        <button id="registerBtn">Register</button>
+
+
+    </div>
+    <div id="right"></div>
+</div>
+
+    <script>
+        const loginBtn = document.getElementById("loginBtn");
+        loginBtn.addEventListener("click", function (){
+            const email = document.getElementById("email");
+            const password = document.getElementById("password");
+            const loginRequest = {
+                email: email.value,
+                password: password.value
+            };
+            const loginRequestJson = JSON.stringify(loginRequest);
+            fetch('/auth/login', {
+                method: 'POST',
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: loginRequestJson
+            }).then(response => {
+                if (!response.ok) {
+                    throw new Error("Incorrect Credentials!");
+                }
+                return response.json();
+            }).then(data => {
+                const response = document.getElementById("responseMessage");
+                response.textContent = "Login Successful!";
+               localStorage.setItem("userId", data.userId);
+               localStorage.setItem("userName", data.userName);
+               window.location.href = "index.html";
+            }).catch(error => {
+                document.getElementById("responseMessage").textContent =
+                    error.message;
+            });
+        });
+
+
+        const registerBtn = document.getElementById("registerBtn");
+        registerBtn.addEventListener("click", function (){
+            window.location.href = "register.html";
+        })
+
+        const loginWindow = document.getElementById("loginWindow");
+        loginWindow.addEventListener("keydown", function (event){
+            if(event.key === "Enter"){
+                loginBtn.click();
+            }
+        });
+    </script>
+
+</body>
+</html>

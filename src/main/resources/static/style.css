@@ -7,16 +7,10 @@
     overflow-wrap: break-word;
 }
 
-#left{
-    width: 500px;
-}
-
-#right{
-    width: 500px;
-}
 
 #layout{
     display: flex;
+    justify-content: center;
 }
 
 #inputDiv{
@@ -40,6 +34,14 @@
     text-align: center;
 }
 
+#login-box {
+    border: 5px solid black;
+    padding: 20px;
+    width: 400px;
+    height: 500px;
+    text-align: center;
+}
+
 body {
     margin: 0;
     display: flex;
@@ -51,4 +53,11 @@ body {
 #responseMessage {
     color: red;
     font-weight: bold;
+}
+
+#logoutBtn{
+    position: absolute;
+    top: 20px;
+    right: 20px;
+
 }

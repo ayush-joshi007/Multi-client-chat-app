@@ -4,8 +4,10 @@ import com.chatapp.Mapper.impl.MessageMapper;
 import com.chatapp.dto.MessageDto;
 import com.chatapp.entity.MessageEntity;
 import com.chatapp.repository.MessageRepository;
+import com.chatapp.repository.UserRepository;
 import lombok.AllArgsConstructor;
 import org.modelmapper.ModelMapper;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -17,44 +19,44 @@ import java.util.Optional;
 public class MessageService {
 
     private final MessageRepository messageRepository;
+    private final UserRepository userRepository;
 
     private final MessageMapper messageMapper;
     private final ModelMapper modelMapper;
 
     public MessageDto sendMessage(MessageDto messageDto){
 
-        String userName = messageDto.getUserName();//TEMPORARY SENDER NAME
-
         MessageEntity messageEntity = messageMapper.mapFrom(messageDto);
+
+        if(messageDto.getSenderId() != null){
+            userRepository.findById(messageDto.getSenderId())
+                    .ifPresent(messageEntity::setSender);
+        }
         MessageEntity savedMessageEntity =  messageRepository.save(messageEntity);
         MessageDto responseDto = messageMapper.mapTo(savedMessageEntity);
 
-        responseDto.setUserName(userName); //TEMPORARY SENDER NAME
+        if(savedMessageEntity.getSender() != null){
+            responseDto.setUserName(savedMessageEntity.getSender().getUserName());
+            responseDto.setSenderId(savedMessageEntity.getSender().getUserId());
+
+        }
 
         return responseDto;
     }
 
     public List<MessageDto> getHistory() {
-        Iterable<MessageEntity> result= messageRepository.findAll();
+        Iterable<MessageEntity> result= messageRepository.findAll(Sort.by("createdAt"));
         List<MessageDto> li = new ArrayList<>();
         for(MessageEntity m: result){
             MessageDto msgDto = messageMapper.mapTo(m);
+            if(m.getSender() != null){
+                msgDto.setUserName(m.getSender().getUserName());
+                msgDto.setSenderId(m.getSender().getUserId());
+            }
             li.add(msgDto);
         }
         return li;
     }
 
 
-
-
-//    public List<MessageEntity> getChatHistory(Long senderId, Long receiverId){
-//        Iterable<MessageEntity> result= messageRepository.findBySenderIdAndReceiverId(senderId, receiverId);
-//        Iterable<MessageEntity> reverseResult= messageRepository.findBySenderIdAndReceiverId(receiverId, senderId);
-//        List<MessageEntity> chatHistory = new ArrayList<>();
-//        result.forEach(chatHistory::add);
-//        reverseResult.forEach(chatHistory::add);
-//        chatHistory.sort((m1, m2) -> m1.getCreatedAt().compareTo(m2.getCreatedAt()));
-//        return chatHistory;
-//
-//    }
 }
