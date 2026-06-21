@@ -13,6 +13,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import static org.springframework.http.ResponseEntity.status;
+
 @AllArgsConstructor
 @RestController
 @RequestMapping("/auth")
@@ -24,28 +26,19 @@ public class AuthController {
     public ResponseEntity<String> register(@Valid @RequestBody RegisterRequest registerRequest){
         boolean success= authService.register(registerRequest);
         if(success){
-            return ResponseEntity.status(200).body("Registration Successful!");
+            return status(200).body("Registration Successful!");
         }
         else{
-            return ResponseEntity.status(409).body("Account Already Exists!");
+            return status(409).body("Account Already Exists!");
         }
     }
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody LoginRequest loginRequest) {
+    public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest loginRequest) {
 
-        UserEntity user = authService.login(loginRequest);
+        LoginResponse loginResponse= authService.login(loginRequest);
 
-        if (user != null) {
-            return ResponseEntity.ok(
-                    new LoginResponse(
-                            user.getUserId(),
-                            user.getUserName()
-                    )
-            );
-        }
+        return ResponseEntity.ok(loginResponse);
 
-        return ResponseEntity.status(401)
-                .body("Incorrect Credentials!");
     }
 }

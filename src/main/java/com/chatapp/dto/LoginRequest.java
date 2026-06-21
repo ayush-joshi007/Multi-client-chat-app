@@ -14,9 +14,8 @@ import lombok.NoArgsConstructor;
 @Builder
 public class LoginRequest {
 
-    @Email
     @NotBlank
-    private String email;
+    private String userName;
 
     @NotBlank
     @Size(min = 8)

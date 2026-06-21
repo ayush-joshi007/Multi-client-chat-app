@@ -3,11 +3,15 @@ package com.chatapp.service;
 
 import com.chatapp.Mapper.impl.RegisterRequestMapper;
 import com.chatapp.dto.LoginRequest;
+import com.chatapp.dto.LoginResponse;
 import com.chatapp.dto.RegisterRequest;
 import com.chatapp.entity.UserEntity;
 import com.chatapp.repository.UserRepository;
 import lombok.AllArgsConstructor;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.Optional;
@@ -18,7 +22,9 @@ public class AuthService {
 
     private UserRepository userRepository;
     private RegisterRequestMapper registerRequestMapper;
-    private BCryptPasswordEncoder bCryptPasswordEncoder;
+    private PasswordEncoder passwordEncoder;
+    private AuthenticationManager authenticationManager;
+    private JwtService jwtService;
 
     public boolean register(RegisterRequest registerRequest) {
 
@@ -38,7 +44,7 @@ public class AuthService {
 
         String password = registerRequest.getPassword();
         String hashedPassword =
-                bCryptPasswordEncoder.encode(password);
+                passwordEncoder.encode(password);
 
         userEntity.setPassword(hashedPassword);
 
@@ -46,23 +52,33 @@ public class AuthService {
 
         return true;
     }
-    public UserEntity login(LoginRequest loginRequest){
+    public LoginResponse login(LoginRequest loginRequest){
 
-        String email = loginRequest.getEmail();
+        String userName = loginRequest.getUserName();
         String password = loginRequest.getPassword();
 
-        Optional<UserEntity> foundUserEntity = userRepository.findByEmail(email);
+        authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(
+                        userName,
+                        password
+                )
+        );
 
-        if(foundUserEntity.isPresent()){
+        String token = jwtService.generateToken(userName);
 
-            UserEntity userEntity = foundUserEntity.get();
+        UserEntity userEntity = userRepository.findByUserName(userName)
+                        .orElseThrow(
+                                () -> new RuntimeException(
+                                        "User not found"
+                                )
+                        );
 
-            if(bCryptPasswordEncoder.matches(password, userEntity.getPassword())){
-                return userEntity;
-            }
-        }
 
-        return null;
+        return new LoginResponse(
+                userEntity.getUserId(),
+                userEntity.getUserName(),
+                token
+        );
     }
 
 
