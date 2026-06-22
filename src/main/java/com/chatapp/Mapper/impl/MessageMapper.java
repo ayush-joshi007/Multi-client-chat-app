@@ -17,11 +17,11 @@ public class MessageMapper implements Mapper<MessageEntity, MessageDto> {
     public MessageEntity mapFrom(MessageDto messageDto) {
 
 
-        MessageEntity entity = modelMapper.map(messageDto, MessageEntity.class);
+        MessageEntity messageEntity = new MessageEntity();
 
-        entity.setId(null); // defensive
+        messageEntity.setContent(messageDto.getContent());
 
-        return entity;
+        return messageEntity;
     }
 
     @Override

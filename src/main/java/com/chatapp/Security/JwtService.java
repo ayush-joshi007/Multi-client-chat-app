@@ -1,4 +1,4 @@
-package com.chatapp.service;
+package com.chatapp.Security;
 
 
 import io.jsonwebtoken.Claims;

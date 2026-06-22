@@ -2,6 +2,7 @@ package com.chatapp.service;
 
 
 import com.chatapp.Mapper.impl.RegisterRequestMapper;
+import com.chatapp.Security.JwtService;
 import com.chatapp.dto.LoginRequest;
 import com.chatapp.dto.LoginResponse;
 import com.chatapp.dto.RegisterRequest;
@@ -10,7 +11,6 @@ import com.chatapp.repository.UserRepository;
 import lombok.AllArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 

@@ -25,6 +25,10 @@ public class MessageEntity {
     @JoinColumn(name = "sender_id")
     private UserEntity sender;
 
+    @ManyToOne
+    @JoinColumn(name = "receiver_id")
+    private UserEntity receiver;
+
     private String content;
 
     @CreationTimestamp

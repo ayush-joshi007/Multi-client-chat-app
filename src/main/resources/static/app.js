@@ -1,6 +1,7 @@
-const userId = localStorage.getItem("userId");
-if(userId==null){
-    window.location.href = 'login.html';
+const token = localStorage.getItem("token");
+
+if (!token) {
+    window.location.href = "/login.html";
 }
 
 const client = new StompJs.Client({
@@ -16,7 +17,11 @@ function loadMessages(){
     const div = document.getElementById("messages");
     div.innerHTML = "";
 
-    fetch('http://localhost:8080/messages')
+    fetch('http://localhost:8080/messages', {
+        headers: {
+            Authorization: `Bearer ${token}`
+        }
+    })
         .then(response => response.json())
         .then(data =>{
             for(const msg of data){
@@ -39,6 +44,7 @@ client.onConnect = () => {
     console.log("CONNECTED", new Date());
 
     loadMessages();
+    loadUsers();
 
     client.subscribe('/topic/messages', function(message){
 
@@ -55,6 +61,21 @@ client.onConnect = () => {
         div.scrollTop = div.scrollHeight;
 
         console.log("RECEIVED!", new Date());
+    });
+
+    client.subscribe('/topic/user/'+localStorage.getItem("userId"), function (message){
+        const messageData = JSON.parse(message.body);
+
+        const div = document.getElementById("messages");
+        const messageDiv = document.createElement("div");
+
+        messageDiv.classList.add("message");
+        messageDiv.textContent =
+            messageData.userName + ": " + messageData.content;
+
+        div.appendChild(messageDiv);
+        div.scrollTop = div.scrollHeight;
+
     });
 
     console.log("Connected!");
@@ -105,3 +126,27 @@ logoutBtn.addEventListener("click", function (){
     localStorage.clear();
     window.location.href = "login.html";
 })
+
+const usersDiv = document.getElementById("users");
+function loadUsers(){
+    usersDiv.innerHTML = "";
+    fetch('users', {
+        headers: {
+            Authorization: `Bearer ${token}`
+        }
+    })
+        .then(response => response.json())
+        .then(users =>{
+            usersDiv.innerHTML = "<h3>Users List</h3>";
+            for(const user of users){
+
+                const userDiv = document.createElement("div");
+                userDiv.classList.add("user");
+                userDiv.textContent = user.userName;
+
+                usersDiv.appendChild(userDiv);
+            }
+        })
+        .catch(error => console.error('Error:', error));
+
+}

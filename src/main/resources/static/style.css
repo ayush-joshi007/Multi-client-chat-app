@@ -9,8 +9,8 @@
 
 
 #layout{
-    display: flex;
-    justify-content: center;
+    display:flex;
+    margin-top:50px;
 }
 
 #inputDiv{
@@ -42,7 +42,8 @@
     text-align: center;
 }
 
-body {
+.register-page,
+.login-page{
     margin: 0;
     display: flex;
     justify-content: center;
@@ -59,5 +60,34 @@ body {
     position: absolute;
     top: 20px;
     right: 20px;
+    cursor: pointer;
+}
 
+#chat{
+    width:800px;
+    justify-content:center;
+    margin-left: 50px;
+}
+
+#users{
+    width:200px;
+    margin-right:20px;
+    margin-left:20px;
+}
+
+.user{
+    padding:10px;
+    border:1px solid black;
+    margin-bottom:5px;
+    cursor:pointer;
+}
+
+#loginBtn{
+    cursor: pointer;
+}
+#registerBtn{
+    cursor: pointer;
+}
+#send{
+    cursor: pointer;
 }

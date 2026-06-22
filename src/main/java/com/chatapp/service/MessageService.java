@@ -7,12 +7,10 @@ import com.chatapp.repository.MessageRepository;
 import com.chatapp.repository.UserRepository;
 import lombok.AllArgsConstructor;
 import org.modelmapper.ModelMapper;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 @AllArgsConstructor
 @Service
@@ -22,7 +20,6 @@ public class MessageService {
     private final UserRepository userRepository;
 
     private final MessageMapper messageMapper;
-    private final ModelMapper modelMapper;
 
     public MessageDto sendMessage(MessageDto messageDto){
 
@@ -32,6 +29,11 @@ public class MessageService {
             userRepository.findById(messageDto.getSenderId())
                     .ifPresent(messageEntity::setSender);
         }
+
+        if(messageDto.getReceiverId() != null){
+            userRepository.findById(messageDto.getReceiverId())
+                    .ifPresent(messageEntity::setReceiver);
+        }
         MessageEntity savedMessageEntity =  messageRepository.save(messageEntity);
         MessageDto responseDto = messageMapper.mapTo(savedMessageEntity);
 
@@ -40,12 +42,16 @@ public class MessageService {
             responseDto.setSenderId(savedMessageEntity.getSender().getUserId());
 
         }
+        if(messageDto.getReceiverId() != null){
+            userRepository.findById(messageDto.getReceiverId())
+                    .ifPresent(messageEntity::setReceiver);
+        }
 
         return responseDto;
     }
 
     public List<MessageDto> getHistory() {
-        Iterable<MessageEntity> result= messageRepository.findAll(Sort.by("createdAt"));
+        Iterable<MessageEntity> result= messageRepository.findByReceiverIsNullOrderByCreatedAt();
         List<MessageDto> li = new ArrayList<>();
         for(MessageEntity m: result){
             MessageDto msgDto = messageMapper.mapTo(m);
@@ -56,6 +62,31 @@ public class MessageService {
             li.add(msgDto);
         }
         return li;
+    }
+
+    public List<MessageDto> getPrivateHistory(Long senderId, Long receiverId){
+
+        List<MessageEntity> result = messageRepository.findPrivateConversation(senderId, receiverId);
+
+        List<MessageDto> messages = new ArrayList<>();
+
+        for(MessageEntity m : result){
+
+            MessageDto msgDto = messageMapper.mapTo(m);
+
+            if(m.getSender() != null){
+                msgDto.setUserName(m.getSender().getUserName());
+                msgDto.setSenderId(m.getSender().getUserId());
+            }
+
+            if(m.getReceiver() != null){
+                msgDto.setReceiverId(m.getReceiver().getUserId());
+            }
+
+            messages.add(msgDto);
+        }
+
+        return messages;
     }
 
 

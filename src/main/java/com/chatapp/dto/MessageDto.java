@@ -12,5 +12,7 @@ import lombok.NoArgsConstructor;
 public class MessageDto {
     private String content;
     private Long senderId;
+    private Long receiverId;
     private String userName;
+
 }
