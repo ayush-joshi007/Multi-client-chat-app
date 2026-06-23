@@ -1,3 +1,4 @@
+let selectedUserId = null;
 const token = localStorage.getItem("token");
 
 if (!token) {
@@ -24,12 +25,34 @@ function loadMessages(){
     })
         .then(response => response.json())
         .then(data =>{
+            let lastSender = null;
+
             for(const msg of data){
 
                 const msgDiv = document.createElement("div");
+
+                if(lastSender !== msg.userName){
+                    msgDiv.style.marginTop = "20px";
+                }
+
+                lastSender = msg.userName;
+
                 msgDiv.classList.add("message");
-                msgDiv.textContent =
-                    msg.userName + ": " + msg.content;
+
+                const myName = localStorage.getItem("userName");
+
+                if(msg.userName === myName){
+                    msgDiv.classList.add("my-message");
+
+                    msgDiv.textContent =
+                        msg.userName + " (You): " + msg.content;
+                }
+                else{
+                    msgDiv.classList.add("other-message");
+
+                    msgDiv.textContent =
+                        msg.userName + ": " + msg.content;
+                }
 
                 div.appendChild(msgDiv);
             }
@@ -50,12 +73,28 @@ client.onConnect = () => {
 
         const messageData = JSON.parse(message.body);
 
+        const myId = parseInt(localStorage.getItem("userId"));
+
         const div = document.getElementById("messages");
         const messageDiv = document.createElement("div");
 
         messageDiv.classList.add("message");
-        messageDiv.textContent =
-            messageData.userName + ": " + messageData.content;
+        const myName = localStorage.getItem("userName");
+        if(messageData.userName === myName){
+            messageDiv.classList.add("my-message");
+        }
+        else{
+            messageDiv.classList.add("other-message");
+        }
+
+        if(messageData.userName === myName){
+            messageDiv.textContent =
+                messageData.userName + " (You): " + messageData.content;
+        }
+        else{
+            messageDiv.textContent =
+                messageData.userName + ": " + messageData.content;
+        }
 
         div.appendChild(messageDiv);
         div.scrollTop = div.scrollHeight;
@@ -66,15 +105,40 @@ client.onConnect = () => {
     client.subscribe('/topic/user/'+localStorage.getItem("userId"), function (message){
         const messageData = JSON.parse(message.body);
 
-        const div = document.getElementById("messages");
-        const messageDiv = document.createElement("div");
+        const myId = parseInt(localStorage.getItem("userId"));
 
-        messageDiv.classList.add("message");
-        messageDiv.textContent =
-            messageData.userName + ": " + messageData.content;
+        if(
+            (messageData.senderId === selectedUserId &&
+                messageData.receiverId === myId)
 
-        div.appendChild(messageDiv);
-        div.scrollTop = div.scrollHeight;
+            ||
+
+            (messageData.senderId === myId &&
+                messageData.receiverId === selectedUserId)
+        ){
+            const div = document.getElementById("messages");
+            const messageDiv = document.createElement("div");
+
+            messageDiv.classList.add("message");
+            const myName = localStorage.getItem("userName");
+            if(messageData.userName === myName){
+                messageDiv.classList.add("my-message");
+            }
+            else{
+                messageDiv.classList.add("other-message");
+            }
+
+            if(messageData.userName === myName){
+                messageDiv.textContent =
+                    messageData.userName + " (You): " + messageData.content;
+            }
+            else{
+                messageDiv.textContent =
+                    messageData.userName + ": " + messageData.content;
+            }
+            div.appendChild(messageDiv);
+            div.scrollTop = div.scrollHeight;
+        }
 
     });
 
@@ -104,9 +168,13 @@ message.addEventListener("keydown", function (event){
 
 sendButton.addEventListener("click", function (){
     const messageBox = document.getElementById("message");
+    if(messageBox.value.trim()===""){
+        return;
+    }
     const messageString={
         content: messageBox.value,
         senderId: parseInt(localStorage.getItem("userId")),
+        receiverId: selectedUserId,
         userName: localStorage.getItem("userName")
     };
     const contentJson = JSON.stringify(messageString);
@@ -138,11 +206,85 @@ function loadUsers(){
         .then(response => response.json())
         .then(users =>{
             usersDiv.innerHTML = "<h3>Users List</h3>";
+            const publicDiv = document.createElement("div");
+            publicDiv.classList.add("user");
+
+            publicDiv.textContent = "🌐 Public Chat";
+            publicDiv.addEventListener("click", function(){
+
+                selectedUserId = null;
+
+                loadMessages();
+
+            });
+            usersDiv.appendChild(publicDiv);
             for(const user of users){
 
                 const userDiv = document.createElement("div");
                 userDiv.classList.add("user");
-                userDiv.textContent = user.userName;
+                const myId = parseInt(localStorage.getItem("userId"));
+
+                if(user.userId === myId){
+                    userDiv.textContent = user.userName + " (You)";
+                }
+                else{
+                    userDiv.textContent = user.userName;
+                }
+
+                userDiv.addEventListener("click", function (){
+                    selectedUserId=user.userId;
+                    const chatWindow = document.getElementById("messages");
+                    const myId = localStorage.getItem("userId");
+                    chatWindow.innerHTML = "";
+                    fetch(
+                        `http://localhost:8080/messages/private?senderId=${myId}&receiverId=${selectedUserId}`,
+                        {
+                            headers:{
+                                Authorization: `Bearer ${token}`
+                            }
+                        }
+                    )
+                    .then(response => response.json())
+                        .then(data => {
+
+                            let lastSender = null;
+
+                            data.forEach(message => {
+
+                                const messageDiv = document.createElement("div");
+
+                                if(lastSender !== message.userName){
+                                    messageDiv.style.marginTop = "20px";
+                                }
+
+                                lastSender = message.userName;
+
+                                messageDiv.classList.add("message");
+
+                                const myName = localStorage.getItem("userName");
+
+                                if(message.userName === myName){
+                                    messageDiv.classList.add("my-message");
+
+                                    messageDiv.textContent =
+                                        message.userName + " (You): " + message.content;
+                                }
+                                else{
+                                    messageDiv.classList.add("other-message");
+
+                                    messageDiv.textContent =
+                                        message.userName + ": " + message.content;
+                                }
+
+                                chatWindow.appendChild(messageDiv);
+
+                            });
+
+                            chatWindow.scrollTop = chatWindow.scrollHeight;
+
+                        });
+                    console.log(selectedUserId);
+                })
 
                 usersDiv.appendChild(userDiv);
             }
@@ -150,3 +292,5 @@ function loadUsers(){
         .catch(error => console.error('Error:', error));
 
 }
+
+

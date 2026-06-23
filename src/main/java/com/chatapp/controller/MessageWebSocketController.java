@@ -16,15 +16,19 @@ public class MessageWebSocketController {
 
         @MessageMapping("/send")
         public void sendMessage(MessageDto messageDto){
-                String destination;
-                if(messageDto.getReceiverId()==null) {
-                        destination = "/topic/messages";
+                MessageDto responseDto = messageService.sendMessage(messageDto);
+
+                if(messageDto.getReceiverId()==null){
+
+                        messagingTemplate.convertAndSend("/topic/messages", responseDto);
+
                 }
                 else{
-                        destination = "/topic/user/" + messageDto.getReceiverId();
+
+                        messagingTemplate.convertAndSend("/topic/user/" + messageDto.getReceiverId(),responseDto);
+
+                        messagingTemplate.convertAndSend("/topic/user/" + messageDto.getSenderId(),responseDto);
                 }
-                MessageDto responseDto = messageService.sendMessage(messageDto);
-                messagingTemplate.convertAndSend(destination, responseDto);
         }
 
 }
