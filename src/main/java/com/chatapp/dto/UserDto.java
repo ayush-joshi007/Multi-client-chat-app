@@ -12,4 +12,6 @@ public class UserDto {
     private Long userId;
 
     private String userName;
+
+    private boolean online;
 }

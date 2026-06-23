@@ -68,6 +68,10 @@ client.onConnect = () => {
 
     loadMessages();
     loadUsers();
+    client.publish({
+        destination: '/app/online',
+        body: localStorage.getItem("userId")
+    })
 
     client.subscribe('/topic/messages', function(message){
 
@@ -141,6 +145,15 @@ client.onConnect = () => {
         }
 
     });
+
+    client.subscribe(
+        '/topic/users',
+        function(message){
+
+            loadUsers();
+
+        }
+    );
 
     console.log("Connected!");
 };
@@ -224,11 +237,15 @@ function loadUsers(){
                 userDiv.classList.add("user");
                 const myId = parseInt(localStorage.getItem("userId"));
 
+                let status = user.online ? " 🟢" : " 🔴";
+
                 if(user.userId === myId){
-                    userDiv.textContent = user.userName + " (You)";
+                    userDiv.textContent =
+                        user.userName + " (You)" + status;
                 }
                 else{
-                    userDiv.textContent = user.userName;
+                    userDiv.textContent =
+                        user.userName + status;
                 }
 
                 userDiv.addEventListener("click", function (){
