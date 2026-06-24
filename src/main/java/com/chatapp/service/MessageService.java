@@ -9,6 +9,7 @@ import lombok.AllArgsConstructor;
 import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -22,6 +23,9 @@ public class MessageService {
     private final MessageMapper messageMapper;
 
     public MessageDto sendMessage(MessageDto messageDto){
+
+        System.out.println("NOW = " + LocalDateTime.now());
+
 
         MessageEntity messageEntity = messageMapper.mapFrom(messageDto);
 

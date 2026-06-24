@@ -103,3 +103,7 @@
 #send{
     cursor: pointer;
 }
+
+.timeStamp{
+    text-align: right;
+}

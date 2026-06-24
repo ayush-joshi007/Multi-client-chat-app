@@ -30,6 +30,7 @@ function loadMessages(){
             for(const msg of data){
 
                 const msgDiv = document.createElement("div");
+                const timeStampDiv = document.createElement("div");
 
                 if(lastSender !== msg.userName){
                     msgDiv.style.marginTop = "20px";
@@ -38,6 +39,7 @@ function loadMessages(){
                 lastSender = msg.userName;
 
                 msgDiv.classList.add("message");
+                timeStampDiv.classList.add("timeStamp");
 
                 const myName = localStorage.getItem("userName");
 
@@ -53,6 +55,15 @@ function loadMessages(){
                     msgDiv.textContent =
                         msg.userName + ": " + msg.content;
                 }
+
+                const formattedTime = new Date(msg.createdAt)
+                    .toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit"
+                    });
+``
+                timeStampDiv.textContent = formattedTime;
+                msgDiv.appendChild(timeStampDiv);
 
                 div.appendChild(msgDiv);
             }
@@ -81,8 +92,10 @@ client.onConnect = () => {
 
         const div = document.getElementById("messages");
         const messageDiv = document.createElement("div");
+        const timeStampDiv = document.createElement("div");
 
         messageDiv.classList.add("message");
+        timeStampDiv.classList.add("timeStamp");
         const myName = localStorage.getItem("userName");
         if(messageData.userName === myName){
             messageDiv.classList.add("my-message");
@@ -99,6 +112,16 @@ client.onConnect = () => {
             messageDiv.textContent =
                 messageData.userName + ": " + messageData.content;
         }
+
+        const formattedTime = new Date(messageData.createdAt)
+            .toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit"
+            });
+
+        timeStampDiv.textContent= formattedTime;
+
+        messageDiv.appendChild(timeStampDiv);
 
         div.appendChild(messageDiv);
         div.scrollTop = div.scrollHeight;
