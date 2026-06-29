@@ -20,17 +20,23 @@ public class MessageMapper implements Mapper<MessageEntity, MessageDto> {
         MessageEntity messageEntity = new MessageEntity();
 
         messageEntity.setContent(messageDto.getContent());
+        messageEntity.setStatus(messageDto.getStatus());
 
         return messageEntity;
     }
 
     @Override
     public MessageDto mapTo(MessageEntity messageEntity) {
+
         MessageDto dto = modelMapper.map(messageEntity, MessageDto.class);
 
         if (messageEntity.getSender() != null) {
             dto.setUserName(messageEntity.getSender().getUserName());
             dto.setSenderId(messageEntity.getSender().getUserId());
+        }
+
+        if (messageEntity.getReceiver() != null) {
+            dto.setReceiverId(messageEntity.getReceiver().getUserId());
         }
 
         return dto;

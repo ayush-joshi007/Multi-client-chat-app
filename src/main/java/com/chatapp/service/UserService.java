@@ -1,8 +1,7 @@
 package com.chatapp.service;
 
-import com.chatapp.Mapper.Mapper;
 import com.chatapp.Mapper.impl.UserMapper;
-import com.chatapp.config.OnlineUserTracker;
+import com.chatapp.tracker.OnlineUserTracker;
 import com.chatapp.dto.UserDto;
 import com.chatapp.entity.UserEntity;
 import com.chatapp.repository.UserRepository;

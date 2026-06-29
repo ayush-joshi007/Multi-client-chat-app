@@ -11,6 +11,80 @@ const client = new StompJs.Client({
 
 console.log("app.js loaded");
 
+function renderMessageStatus(timeStampDiv, formattedTime, message) {
+
+    const myId = parseInt(localStorage.getItem("userId"));
+
+    // Show timestamp for everyone.
+    timeStampDiv.textContent = formattedTime;
+
+    // Only sender sees ticks.
+    if (message.senderId !== myId) {
+        return;
+    }
+
+    // Public chat has no ticks.
+    if (message.receiverId == null) {
+        return;
+    }
+
+    switch (message.status) {
+
+        case "SENT":
+            timeStampDiv.textContent = formattedTime + " ✓";
+            break;
+
+        case "DELIVERED":
+            timeStampDiv.textContent = formattedTime + " ✓✓";
+            break;
+
+        case "READ":
+            timeStampDiv.innerHTML =
+                formattedTime +
+                ' <span class="status-tick read">✓✓</span>';
+            break;
+
+        default:
+            timeStampDiv.textContent = formattedTime;
+    }
+}
+
+function createMessageElement(message) {
+
+    const messageDiv = document.createElement("div");
+    const timeStampDiv = document.createElement("div");
+
+    messageDiv.dataset.messageId = message.id;
+
+    messageDiv.classList.add("message");
+    timeStampDiv.classList.add("timeStamp");
+
+    const myName = localStorage.getItem("userName");
+
+    if (message.userName === myName) {
+        messageDiv.classList.add("my-message");
+        messageDiv.textContent =
+            message.userName + " (You): " + message.content;
+    }
+    else {
+        messageDiv.classList.add("other-message");
+        messageDiv.textContent =
+            message.userName + ": " + message.content;
+    }
+
+    const formattedTime = new Date(message.createdAt)
+        .toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit"
+        });
+
+    renderMessageStatus(timeStampDiv, formattedTime, message);
+
+    messageDiv.appendChild(timeStampDiv);
+
+    return messageDiv;
+}
+
 function loadMessages(){
 
     console.log("LOAD MESSAGES CALLED", new Date());
@@ -29,43 +103,15 @@ function loadMessages(){
 
             for(const msg of data){
 
-                const msgDiv = document.createElement("div");
-                const timeStampDiv = document.createElement("div");
+                const messageDiv = createMessageElement(msg);
 
                 if(lastSender !== msg.userName){
-                    msgDiv.style.marginTop = "20px";
+                    messageDiv.style.marginTop = "20px";
                 }
 
                 lastSender = msg.userName;
 
-                msgDiv.classList.add("message");
-                timeStampDiv.classList.add("timeStamp");
-
-                const myName = localStorage.getItem("userName");
-
-                if(msg.userName === myName){
-                    msgDiv.classList.add("my-message");
-
-                    msgDiv.textContent =
-                        msg.userName + " (You): " + msg.content;
-                }
-                else{
-                    msgDiv.classList.add("other-message");
-
-                    msgDiv.textContent =
-                        msg.userName + ": " + msg.content;
-                }
-
-                const formattedTime = new Date(msg.createdAt)
-                    .toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit"
-                    });
-``
-                timeStampDiv.textContent = formattedTime;
-                msgDiv.appendChild(timeStampDiv);
-
-                div.appendChild(msgDiv);
+                div.appendChild(messageDiv);
             }
 
             div.scrollTop = div.scrollHeight;
@@ -88,40 +134,8 @@ client.onConnect = () => {
 
         const messageData = JSON.parse(message.body);
 
-        const myId = parseInt(localStorage.getItem("userId"));
-
         const div = document.getElementById("messages");
-        const messageDiv = document.createElement("div");
-        const timeStampDiv = document.createElement("div");
-
-        messageDiv.classList.add("message");
-        timeStampDiv.classList.add("timeStamp");
-        const myName = localStorage.getItem("userName");
-        if(messageData.userName === myName){
-            messageDiv.classList.add("my-message");
-        }
-        else{
-            messageDiv.classList.add("other-message");
-        }
-
-        if(messageData.userName === myName){
-            messageDiv.textContent =
-                messageData.userName + " (You): " + messageData.content;
-        }
-        else{
-            messageDiv.textContent =
-                messageData.userName + ": " + messageData.content;
-        }
-
-        const formattedTime = new Date(messageData.createdAt)
-            .toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit"
-            });
-
-        timeStampDiv.textContent= formattedTime;
-
-        messageDiv.appendChild(timeStampDiv);
+        const messageDiv = createMessageElement(messageData);
 
         div.appendChild(messageDiv);
         div.scrollTop = div.scrollHeight;
@@ -130,6 +144,8 @@ client.onConnect = () => {
     });
 
     client.subscribe('/topic/user/'+localStorage.getItem("userId"), function (message){
+
+        console.log(JSON.parse(message.body));
         const messageData = JSON.parse(message.body);
 
         const myId = parseInt(localStorage.getItem("userId"));
@@ -143,28 +159,33 @@ client.onConnect = () => {
             (messageData.senderId === myId &&
                 messageData.receiverId === selectedUserId)
         ){
+
             const div = document.getElementById("messages");
-            const messageDiv = document.createElement("div");
 
-            messageDiv.classList.add("message");
-            const myName = localStorage.getItem("userName");
-            if(messageData.userName === myName){
-                messageDiv.classList.add("my-message");
+            const existingMessage = document.querySelector(
+                `[data-message-id="${messageData.id}"]`
+            );
+
+            if(existingMessage == null){
+
+                const messageDiv = createMessageElement(messageData);
+
+                div.appendChild(messageDiv);
+                div.scrollTop = div.scrollHeight;
+
             }
             else{
-                messageDiv.classList.add("other-message");
-            }
+                const timeStampDiv = existingMessage.querySelector(".timeStamp");
 
-            if(messageData.userName === myName){
-                messageDiv.textContent =
-                    messageData.userName + " (You): " + messageData.content;
+                const formattedTime = new Date(messageData.createdAt)
+                    .toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit"
+                    });
+
+                renderMessageStatus(timeStampDiv, formattedTime, messageData);
+
             }
-            else{
-                messageDiv.textContent =
-                    messageData.userName + ": " + messageData.content;
-            }
-            div.appendChild(messageDiv);
-            div.scrollTop = div.scrollHeight;
         }
 
     });
@@ -239,97 +260,86 @@ function loadUsers(){
             Authorization: `Bearer ${token}`
         }
     })
-        .then(response => response.json())
-        .then(users =>{
-            usersDiv.innerHTML = "<h3>Users List</h3>";
-            const publicDiv = document.createElement("div");
-            publicDiv.classList.add("user");
+    .then(response => response.json())
+    .then(users =>{
+        usersDiv.innerHTML = "<h3>Users List</h3>";
+        const publicDiv = document.createElement("div");
+        publicDiv.classList.add("user");
 
-            publicDiv.textContent = "🌐 Public Chat";
-            publicDiv.addEventListener("click", function(){
+        publicDiv.textContent = "🌐 Public Chat";
+        publicDiv.addEventListener("click", function(){
 
-                selectedUserId = null;
+            selectedUserId = null;
 
-                loadMessages();
-
+            client.publish({
+                destination: "/app/leaveChat",
+                body: localStorage.getItem("userId")
             });
-            usersDiv.appendChild(publicDiv);
-            for(const user of users){
 
-                const userDiv = document.createElement("div");
-                userDiv.classList.add("user");
-                const myId = parseInt(localStorage.getItem("userId"));
+            loadMessages();
 
-                let status = user.online ? " 🟢" : " 🔴";
+        });
 
-                if(user.userId === myId){
-                    userDiv.textContent =
-                        user.userName + " (You)" + status;
-                }
-                else{
-                    userDiv.textContent =
-                        user.userName + status;
-                }
+        usersDiv.appendChild(publicDiv);
+        for(const user of users){
 
-                userDiv.addEventListener("click", function (){
-                    selectedUserId=user.userId;
-                    const chatWindow = document.getElementById("messages");
-                    const myId = localStorage.getItem("userId");
-                    chatWindow.innerHTML = "";
-                    fetch(
-                        `http://localhost:8080/messages/private?senderId=${myId}&receiverId=${selectedUserId}`,
-                        {
-                            headers:{
-                                Authorization: `Bearer ${token}`
-                            }
+            const userDiv = document.createElement("div");
+            userDiv.classList.add("user");
+            const myId = parseInt(localStorage.getItem("userId"));
+
+            let status = user.online ? " 🟢" : " ⚪";
+
+            if(user.userId === myId){
+                userDiv.textContent =
+                    user.userName + " (You)" + status;
+            }
+            else{
+                userDiv.textContent =
+                    user.userName + status;
+            }
+
+            userDiv.addEventListener("click", function (){
+                selectedUserId=user.userId;
+                const chatWindow = document.getElementById("messages");
+                const myId = localStorage.getItem("userId");
+                chatWindow.innerHTML = "";
+                fetch(
+                    `http://localhost:8080/messages/private?senderId=${myId}&receiverId=${selectedUserId}`,
+                    {
+                        headers:{
+                            Authorization: `Bearer ${token}`
                         }
-                    )
-                    .then(response => response.json())
-                        .then(data => {
+                    }
+                )
+                .then(response => response.json())
+                    .then(data => {
 
-                            let lastSender = null;
+                        let lastSender = null;
 
-                            data.forEach(message => {
+                        data.forEach(message => {
 
-                                const messageDiv = document.createElement("div");
+                            const messageDiv = createMessageElement(message);
 
-                                if(lastSender !== message.userName){
-                                    messageDiv.style.marginTop = "20px";
-                                }
+                            if(lastSender !== message.userName){
+                                messageDiv.style.marginTop = "20px";
+                            }
 
-                                lastSender = message.userName;
+                            lastSender = message.userName;
 
-                                messageDiv.classList.add("message");
-
-                                const myName = localStorage.getItem("userName");
-
-                                if(message.userName === myName){
-                                    messageDiv.classList.add("my-message");
-
-                                    messageDiv.textContent =
-                                        message.userName + " (You): " + message.content;
-                                }
-                                else{
-                                    messageDiv.classList.add("other-message");
-
-                                    messageDiv.textContent =
-                                        message.userName + ": " + message.content;
-                                }
-
-                                chatWindow.appendChild(messageDiv);
-
-                            });
-
-                            chatWindow.scrollTop = chatWindow.scrollHeight;
+                            chatWindow.appendChild(messageDiv);
 
                         });
-                    console.log(selectedUserId);
-                })
 
-                usersDiv.appendChild(userDiv);
-            }
-        })
-        .catch(error => console.error('Error:', error));
+                        chatWindow.scrollTop = chatWindow.scrollHeight;
+
+                    });
+                console.log(selectedUserId);
+            })
+
+            usersDiv.appendChild(userDiv);
+        }
+    })
+    .catch(error => console.error('Error:', error));
 
 }
 

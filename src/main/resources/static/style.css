@@ -107,3 +107,7 @@
 .timeStamp{
     text-align: right;
 }
+
+.status-tick.read{
+    color: #34b7f1;
+}

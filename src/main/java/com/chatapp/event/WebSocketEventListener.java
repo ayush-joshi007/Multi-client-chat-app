@@ -1,6 +1,7 @@
 package com.chatapp.event;
 
-import com.chatapp.config.OnlineUserTracker;
+import com.chatapp.tracker.ActiveChatTracker;
+import com.chatapp.tracker.OnlineUserTracker;
 import lombok.AllArgsConstructor;
 import org.springframework.context.event.EventListener;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -13,6 +14,7 @@ public class WebSocketEventListener {
 
     private final OnlineUserTracker onlineUserTracker;
     private final SimpMessagingTemplate messagingTemplate;
+    private final ActiveChatTracker activeChatTracker;
 
     @EventListener
     public void handleDisconnect(SessionDisconnectEvent event) {
@@ -22,7 +24,11 @@ public class WebSocketEventListener {
 
         if(userId != null){
             onlineUserTracker.getOnlineUsers().remove(userId);
+
+            activeChatTracker.getActiveChats().remove(userId);
+
             onlineUserTracker.getSessionToUser().remove(sessionId);
+
             messagingTemplate.convertAndSend("/topic/users", "refresh");
         }
 

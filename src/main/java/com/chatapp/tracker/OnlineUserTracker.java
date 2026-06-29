@@ -1,4 +1,4 @@
-package com.chatapp.config;
+package com.chatapp.tracker;
 
 import lombok.Getter;
 import org.springframework.stereotype.Component;
