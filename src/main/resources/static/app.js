@@ -6,7 +6,10 @@ if (!token) {
 }
 
 const client = new StompJs.Client({
-    brokerURL: 'ws://localhost:8080/ws'
+    brokerURL: 'ws://localhost:8080/ws',
+    connectHeaders: {
+        Authorization: `Bearer ${token}`
+    }
 });
 
 console.log("app.js loaded");
@@ -127,8 +130,7 @@ client.onConnect = () => {
     loadUsers();
     client.publish({
         destination: '/app/online',
-        body: localStorage.getItem("userId")
-    })
+    });
 
     client.subscribe('/topic/messages', function(message){
 
@@ -272,8 +274,7 @@ function loadUsers(){
             selectedUserId = null;
 
             client.publish({
-                destination: "/app/leaveChat",
-                body: localStorage.getItem("userId")
+                destination: "/app/leaveChat"
             });
 
             loadMessages();

@@ -11,8 +11,6 @@ import com.chatapp.repository.UserRepository;
 import lombok.AllArgsConstructor;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
-
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -28,8 +26,6 @@ public class MessageService {
     private final SimpMessagingTemplate messagingTemplate;
 
     public MessageDto sendMessage(MessageDto messageDto) {
-
-        System.out.println("NOW = " + LocalDateTime.now());
 
         // Receiver is online
         if (onlineUserTracker.getOnlineUsers().contains(messageDto.getReceiverId())) {
