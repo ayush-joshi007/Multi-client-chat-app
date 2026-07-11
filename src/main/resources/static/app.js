@@ -128,9 +128,6 @@ client.onConnect = () => {
 
     loadMessages();
     loadUsers();
-    client.publish({
-        destination: '/app/online',
-    });
 
     client.subscribe('/topic/messages', function(message){
 

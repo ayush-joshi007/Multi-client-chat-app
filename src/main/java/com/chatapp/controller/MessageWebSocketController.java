@@ -2,7 +2,6 @@ package com.chatapp.controller;
 
 import com.chatapp.service.UserService;
 import com.chatapp.tracker.ActiveChatTracker;
-import com.chatapp.tracker.OnlineUserTracker;
 import com.chatapp.dto.MessageDto;
 import com.chatapp.service.MessageService;
 import lombok.AllArgsConstructor;
@@ -22,7 +21,6 @@ public class MessageWebSocketController {
 
         private final MessageService messageService;
         private final SimpMessagingTemplate messagingTemplate;
-        private final OnlineUserTracker onlineUserTracker;
         private final ActiveChatTracker activeChatTracker;
         private final UserService userService;
 
@@ -58,35 +56,6 @@ public class MessageWebSocketController {
                         messagingTemplate.convertAndSend("/topic/user/" + messageDto.getReceiverId(), responseDto);
                         messagingTemplate.convertAndSend("/topic/user/" + messageDto.getSenderId(), responseDto);
                 }
-        }
-        @MessageMapping("/online")
-        public void markOnline(Principal principal, SimpMessageHeaderAccessor accessor){
-
-                Principal effectivePrincipal = principal;
-                if (effectivePrincipal == null && accessor != null) {
-                    effectivePrincipal = accessor.getUser();
-                }
-
-                if (effectivePrincipal == null) {
-                        log.warn("Rejected unauthenticated STOMP message");
-                    throw new MessagingException("Unauthenticated STOMP message");
-                }
-
-                String username = effectivePrincipal.getName();
-                Long userId = userService.getUserIdByUserName(username);
-
-                log.debug("Authenticated STOMP request from user '{}'", username);
-
-                String sessionId = accessor.getSessionId();
-
-                onlineUserTracker.getOnlineUsers().add(userId);
-
-                messageService.markPendingMessagesAsDelivered(userId);
-
-                onlineUserTracker.getSessionToUser().put(sessionId, userId);
-
-                messagingTemplate.convertAndSend("/topic/users", "refresh");
-
         }
 
         @MessageMapping("/leaveChat")

@@ -2,7 +2,6 @@ package com.chatapp.service;
 
 import com.chatapp.Mapper.impl.MessageMapper;
 import com.chatapp.tracker.ActiveChatTracker;
-import com.chatapp.tracker.OnlineUserTracker;
 import com.chatapp.dto.MessageDto;
 import com.chatapp.entity.MessageEntity;
 import com.chatapp.entity.MessageStatus;
@@ -21,32 +20,35 @@ public class MessageService {
     private final MessageRepository messageRepository;
     private final UserRepository userRepository;
     private final MessageMapper messageMapper;
-    private final OnlineUserTracker onlineUserTracker;
+    private final PresenceService presenceService;
     private final ActiveChatTracker activeChatTracker;
     private final SimpMessagingTemplate messagingTemplate;
 
     public MessageDto sendMessage(MessageDto messageDto) {
 
-        // Receiver is online
-        if (onlineUserTracker.getOnlineUsers().contains(messageDto.getReceiverId())) {
+        if (messageDto.getReceiverId() != null) {
 
-            messageDto.setStatus(MessageStatus.DELIVERED);
+            // Receiver is online
+            if (presenceService.isOnline(messageDto.getReceiverId())) {
 
-            // Receiver is currently viewing sender's chat
-            Long openedChat = activeChatTracker
-                    .getActiveChats()
-                    .get(messageDto.getReceiverId());
+                messageDto.setStatus(MessageStatus.DELIVERED);
 
-            if (openedChat != null &&
-                    openedChat.equals(messageDto.getSenderId())) {
+                // Receiver is currently viewing sender's chat
+                Long openedChat = activeChatTracker
+                        .getActiveChats()
+                        .get(messageDto.getReceiverId());
 
-                messageDto.setStatus(MessageStatus.READ);
+                if (openedChat != null &&
+                        openedChat.equals(messageDto.getSenderId())) {
+
+                    messageDto.setStatus(MessageStatus.READ);
+                }
+
+            } else {
+
+                // Receiver is offline
+                messageDto.setStatus(MessageStatus.SENT);
             }
-
-        } else {
-
-            // Receiver is offline
-            messageDto.setStatus(MessageStatus.SENT);
         }
 
         MessageEntity messageEntity = messageMapper.mapFrom(messageDto);

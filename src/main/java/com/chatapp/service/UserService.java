@@ -1,7 +1,6 @@
 package com.chatapp.service;
 
 import com.chatapp.Mapper.impl.UserMapper;
-import com.chatapp.tracker.OnlineUserTracker;
 import com.chatapp.dto.UserDto;
 import com.chatapp.entity.UserEntity;
 import com.chatapp.repository.UserRepository;
@@ -19,7 +18,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final UserMapper userMapper;
 
-    private final OnlineUserTracker onlineUserTracker;
+    private final PresenceService presenceService;
 
     public List<UserDto> getAllUsers(){
         Iterable<UserEntity> userEntities= userRepository.findAll();
@@ -29,7 +28,7 @@ public class UserService {
 
             UserDto userDto = userMapper.mapTo(user);
 
-            userDto.setOnline(onlineUserTracker.getOnlineUsers().contains(userDto.getUserId()));
+            userDto.setOnline(presenceService.isOnline(userDto.getUserId()));
 
             users.add(userDto);
         }
