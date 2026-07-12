@@ -2,6 +2,7 @@ package com.chatapp.repository;
 
 import com.chatapp.entity.MessageEntity;
 import com.chatapp.entity.MessageStatus;
+import com.chatapp.projection.UnreadCountProjection;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.CrudRepository;
@@ -40,5 +41,18 @@ public interface MessageRepository extends CrudRepository<MessageEntity, Long> {
             Long receiverId,
             MessageStatus status
     );
+
+    @Query("""
+        SELECT
+            m.sender.id AS senderId,
+            COUNT(m) AS unreadCount
+        FROM MessageEntity m
+        WHERE
+            m.receiver.id = :receiverId
+            AND m.status <> com.chatapp.entity.MessageStatus.READ
+        GROUP BY m.sender.id
+    """)
+    List<UnreadCountProjection> findUnreadCountsByReceiverId(@Param("receiverId") Long receiverId);
+
 
 }

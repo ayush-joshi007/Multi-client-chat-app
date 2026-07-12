@@ -1,4 +1,4 @@
-package com.chatapp.entity;;
+package com.chatapp.entity;
 
 public enum MessageStatus {
     SENT,

@@ -5,6 +5,8 @@ if (!token) {
     window.location.href = "/login.html";
 }
 
+let unreadCountMap = new Map();
+
 const client = new StompJs.Client({
     brokerURL: 'ws://localhost:8080/ws',
     connectHeaders: {
@@ -127,7 +129,7 @@ client.onConnect = () => {
     console.log("CONNECTED", new Date());
 
     loadMessages();
-    loadUsers();
+    loadUnreadCounts();
 
     client.subscribe('/topic/messages', function(message){
 
@@ -173,7 +175,7 @@ client.onConnect = () => {
                 div.scrollTop = div.scrollHeight;
 
             }
-            else{
+            else {
                 const timeStampDiv = existingMessage.querySelector(".timeStamp");
 
                 const formattedTime = new Date(messageData.createdAt)
@@ -186,6 +188,7 @@ client.onConnect = () => {
 
             }
         }
+        loadUnreadCounts();
 
     });
 
@@ -253,6 +256,7 @@ logoutBtn.addEventListener("click", function (){
 
 const usersDiv = document.getElementById("users");
 function loadUsers(){
+
     usersDiv.innerHTML = "";
     fetch('users', {
         headers: {
@@ -287,6 +291,8 @@ function loadUsers(){
 
             let status = user.online ? " 🟢" : " ⚪";
 
+            const unreadCount = unreadCountMap.get(user.userId);
+
             if(user.userId === myId){
                 userDiv.textContent =
                     user.userName + " (You)" + status;
@@ -294,6 +300,10 @@ function loadUsers(){
             else{
                 userDiv.textContent =
                     user.userName + status;
+            }
+
+            if (unreadCount !== undefined) {
+                userDiv.textContent += ` (${unreadCount})`;
             }
 
             userDiv.addEventListener("click", function (){
@@ -330,6 +340,8 @@ function loadUsers(){
 
                         chatWindow.scrollTop = chatWindow.scrollHeight;
 
+                        loadUnreadCounts();
+
                     });
                 console.log(selectedUserId);
             })
@@ -339,6 +351,30 @@ function loadUsers(){
     })
     .catch(error => console.error('Error:', error));
 
+}
+
+function loadUnreadCounts() {
+    fetch('http://localhost:8080/messages/unread-counts', {
+        headers: {
+            Authorization: `Bearer ${token}`
+        }
+    })
+    .then(response => response.json())
+    .then(unreadCounts => {
+        // Handle unread counts
+        unreadCountMap.clear();
+
+        for(const unreadCount of unreadCounts){
+            unreadCountMap.set(
+                unreadCount.senderId,
+                unreadCount.unreadCount
+            );
+
+        }
+        loadUsers();
+        console.log("Map populated:", unreadCountMap);
+    })
+    .catch(error => console.error('Error:', error));
 }
 
 

@@ -1,6 +1,7 @@
 package com.chatapp.service;
 
 import com.chatapp.Mapper.impl.MessageMapper;
+import com.chatapp.projection.UnreadCountProjection;
 import com.chatapp.tracker.ActiveChatTracker;
 import com.chatapp.dto.MessageDto;
 import com.chatapp.entity.MessageEntity;
@@ -161,6 +162,10 @@ public class MessageService {
                     messageMapper.mapTo(message)
             );
         }
+    }
+
+    public List<UnreadCountProjection> getUnreadCounts(Long receiverId){
+        return messageRepository.findUnreadCountsByReceiverId(receiverId);
     }
 
 

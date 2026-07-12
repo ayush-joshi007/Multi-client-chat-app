@@ -40,4 +40,10 @@ public class UserService {
                 .map(UserEntity::getUserId)
                 .orElseThrow(() -> new RuntimeException("User not found: " + userName));
     }
+
+    public Long getUserIdByUsername(String username) {
+        return userRepository.findByUserName(username)
+                .orElseThrow()
+                .getUserId();
+    }
 }
