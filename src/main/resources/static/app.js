@@ -5,8 +5,6 @@ if (!token) {
     window.location.href = "/login.html";
 }
 
-let unreadCountMap = new Map();
-
 const client = new StompJs.Client({
     brokerURL: 'ws://localhost:8080/ws',
     connectHeaders: {
@@ -129,7 +127,7 @@ client.onConnect = () => {
     console.log("CONNECTED", new Date());
 
     loadMessages();
-    loadUnreadCounts();
+    loadConversations();
 
     client.subscribe('/topic/messages', function(message){
 
@@ -188,7 +186,7 @@ client.onConnect = () => {
 
             }
         }
-        loadUnreadCounts();
+        loadConversations();
 
     });
 
@@ -196,7 +194,7 @@ client.onConnect = () => {
         '/topic/users',
         function(message){
 
-            loadUsers();
+            loadConversations();
 
         }
     );
@@ -255,126 +253,153 @@ logoutBtn.addEventListener("click", function (){
 })
 
 const usersDiv = document.getElementById("users");
-function loadUsers(){
+function formatConversationTime(lastMessageTime) {
+    if (lastMessageTime == null) {
+        return "";
+    }
 
-    usersDiv.innerHTML = "";
-    fetch('users', {
-        headers: {
-            Authorization: `Bearer ${token}`
+    return new Date(lastMessageTime)
+        .toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit"
+        });
+}
+
+function openPrivateConversation(partnerId) {
+    selectedUserId = partnerId;
+
+    const chatWindow = document.getElementById("messages");
+    const myId = localStorage.getItem("userId");
+    chatWindow.innerHTML = "";
+
+    fetch(
+        `http://localhost:8080/messages/private?senderId=${myId}&receiverId=${selectedUserId}`,
+        {
+            headers:{
+                Authorization: `Bearer ${token}`
+            }
         }
-    })
+    )
     .then(response => response.json())
-    .then(users =>{
-        usersDiv.innerHTML = "<h3>Users List</h3>";
-        const publicDiv = document.createElement("div");
-        publicDiv.classList.add("user");
+    .then(data => {
 
-        publicDiv.textContent = "🌐 Public Chat";
-        publicDiv.addEventListener("click", function(){
+        let lastSender = null;
 
-            selectedUserId = null;
+        data.forEach(message => {
 
-            client.publish({
-                destination: "/app/leaveChat"
-            });
+            const messageDiv = createMessageElement(message);
 
-            loadMessages();
+            if(lastSender !== message.userName){
+                messageDiv.style.marginTop = "20px";
+            }
+
+            lastSender = message.userName;
+
+            chatWindow.appendChild(messageDiv);
 
         });
 
-        usersDiv.appendChild(publicDiv);
-        for(const user of users){
+        chatWindow.scrollTop = chatWindow.scrollHeight;
 
-            const userDiv = document.createElement("div");
-            userDiv.classList.add("user");
-            const myId = parseInt(localStorage.getItem("userId"));
+        loadConversations();
+    });
 
-            let status = user.online ? " 🟢" : " ⚪";
-
-            const unreadCount = unreadCountMap.get(user.userId);
-
-            if(user.userId === myId){
-                userDiv.textContent =
-                    user.userName + " (You)" + status;
-            }
-            else{
-                userDiv.textContent =
-                    user.userName + status;
-            }
-
-            if (unreadCount !== undefined) {
-                userDiv.textContent += ` (${unreadCount})`;
-            }
-
-            userDiv.addEventListener("click", function (){
-                selectedUserId=user.userId;
-                const chatWindow = document.getElementById("messages");
-                const myId = localStorage.getItem("userId");
-                chatWindow.innerHTML = "";
-                fetch(
-                    `http://localhost:8080/messages/private?senderId=${myId}&receiverId=${selectedUserId}`,
-                    {
-                        headers:{
-                            Authorization: `Bearer ${token}`
-                        }
-                    }
-                )
-                .then(response => response.json())
-                    .then(data => {
-
-                        let lastSender = null;
-
-                        data.forEach(message => {
-
-                            const messageDiv = createMessageElement(message);
-
-                            if(lastSender !== message.userName){
-                                messageDiv.style.marginTop = "20px";
-                            }
-
-                            lastSender = message.userName;
-
-                            chatWindow.appendChild(messageDiv);
-
-                        });
-
-                        chatWindow.scrollTop = chatWindow.scrollHeight;
-
-                        loadUnreadCounts();
-
-                    });
-                console.log(selectedUserId);
-            })
-
-            usersDiv.appendChild(userDiv);
-        }
-    })
-    .catch(error => console.error('Error:', error));
-
+    console.log(selectedUserId);
 }
 
-function loadUnreadCounts() {
-    fetch('http://localhost:8080/messages/unread-counts', {
+function createPublicChatElement() {
+    const publicDiv = document.createElement("div");
+    publicDiv.classList.add("user");
+
+    publicDiv.textContent = "Public Chat";
+    publicDiv.addEventListener("click", function(){
+
+        selectedUserId = null;
+
+        client.publish({
+            destination: "/app/leaveChat"
+        });
+
+        loadMessages();
+
+    });
+
+    return publicDiv;
+}
+
+function createConversationElement(conversation) {
+    const myId = parseInt(localStorage.getItem("userId"));
+    const conversationDiv = document.createElement("div");
+    const headerDiv = document.createElement("div");
+    const nameSpan = document.createElement("span");
+    const statusSpan = document.createElement("span");
+    const timeSpan = document.createElement("span");
+    const previewDiv = document.createElement("div");
+
+    conversationDiv.classList.add("user", "conversation");
+    headerDiv.classList.add("conversation-header");
+    nameSpan.classList.add("conversation-name");
+    statusSpan.classList.add("status-dot");
+    timeSpan.classList.add("conversation-time");
+    previewDiv.classList.add("conversation-preview");
+
+    statusSpan.classList.add(conversation.online ? "online" : "offline");
+
+    nameSpan.textContent = conversation.partnerUsername;
+    if (conversation.partnerId === myId) {
+        nameSpan.textContent += " (You)";
+    }
+
+    timeSpan.textContent = formatConversationTime(conversation.lastMessageTime);
+
+    headerDiv.appendChild(nameSpan);
+    headerDiv.appendChild(statusSpan);
+    headerDiv.appendChild(timeSpan);
+
+    if (conversation.lastMessage == null) {
+        previewDiv.textContent = "Start a conversation";
+    }
+    else if (conversation.lastSenderId === myId) {
+        previewDiv.textContent = "You: " + conversation.lastMessage;
+    }
+    else {
+        previewDiv.textContent = conversation.lastMessage;
+    }
+
+    if (conversation.unreadCount > 0) {
+        const unreadSpan = document.createElement("span");
+        unreadSpan.classList.add("unread-count");
+        unreadSpan.textContent = conversation.unreadCount;
+        previewDiv.appendChild(unreadSpan);
+    }
+
+    conversationDiv.appendChild(headerDiv);
+    conversationDiv.appendChild(previewDiv);
+
+    conversationDiv.addEventListener("click", function (){
+        openPrivateConversation(conversation.partnerId);
+    });
+
+    return conversationDiv;
+}
+
+function loadConversations(){
+
+    usersDiv.innerHTML = "";
+    fetch('http://localhost:8080/conversations', {
         headers: {
             Authorization: `Bearer ${token}`
         }
     })
     .then(response => response.json())
-    .then(unreadCounts => {
-        // Handle unread counts
-        unreadCountMap.clear();
+    .then(conversations =>{
+        usersDiv.innerHTML = "<h3>Conversations</h3>";
+        usersDiv.appendChild(createPublicChatElement());
 
-        for(const unreadCount of unreadCounts){
-            unreadCountMap.set(
-                unreadCount.senderId,
-                unreadCount.unreadCount
-            );
-
+        for(const conversation of conversations){
+            usersDiv.appendChild(createConversationElement(conversation));
         }
-        loadUsers();
-        console.log("Map populated:", unreadCountMap);
     })
     .catch(error => console.error('Error:', error));
 }
-
 

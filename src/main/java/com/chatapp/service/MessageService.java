@@ -1,11 +1,14 @@
 package com.chatapp.service;
 
 import com.chatapp.Mapper.impl.MessageMapper;
+import com.chatapp.dto.ConversationDto;
+import com.chatapp.projection.ConversationSummaryProjection;
 import com.chatapp.projection.UnreadCountProjection;
 import com.chatapp.tracker.ActiveChatTracker;
 import com.chatapp.dto.MessageDto;
 import com.chatapp.entity.MessageEntity;
 import com.chatapp.entity.MessageStatus;
+import com.chatapp.entity.UserEntity;
 import com.chatapp.repository.MessageRepository;
 import com.chatapp.repository.UserRepository;
 import lombok.AllArgsConstructor;
@@ -13,6 +16,8 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @AllArgsConstructor
 @Service
@@ -166,6 +171,85 @@ public class MessageService {
 
     public List<UnreadCountProjection> getUnreadCounts(Long receiverId){
         return messageRepository.findUnreadCountsByReceiverId(receiverId);
+    }
+
+
+    public List<ConversationDto> getConversationSummaries(Long currentUserId) {
+
+        List<ConversationSummaryProjection> conversations =
+                messageRepository.findConversationSummaries(currentUserId);
+
+        Map<Long, ConversationSummaryProjection> conversationByPartnerId =
+                conversations.stream()
+                        .collect(Collectors.toMap(
+                                ConversationSummaryProjection::getPartnerId,
+                                conversation -> conversation
+                        ));
+
+        Map<Long, Long> unreadCounts = messageRepository
+                .findUnreadCountsByReceiverId(currentUserId)
+                .stream()
+                .collect(Collectors.toMap(
+                        UnreadCountProjection::getSenderId,
+                        UnreadCountProjection::getUnreadCount
+                ));
+
+        List<ConversationDto> result = new ArrayList<>();
+
+        for (UserEntity user : userRepository.findAll()) {
+
+            ConversationDto dto = new ConversationDto();
+
+            dto.setPartnerId(user.getUserId());
+            dto.setPartnerUsername(user.getUserName());
+            dto.setOnline(presenceService.isOnline(user.getUserId()));
+            dto.setUnreadCount(
+                    unreadCounts.getOrDefault(user.getUserId(), 0L)
+            );
+
+            ConversationSummaryProjection conversation =
+                    conversationByPartnerId.get(user.getUserId());
+
+            if (conversation != null) {
+                dto.setLastMessage(conversation.getLastMessage());
+                dto.setLastMessageTime(conversation.getLastMessageTime());
+                dto.setLastSenderId(conversation.getLastSenderId());
+            }
+
+            result.add(dto);
+        }
+
+        result.sort((left, right) -> {
+            boolean leftIsCurrentUser = left.getPartnerId().equals(currentUserId);
+            boolean rightIsCurrentUser = right.getPartnerId().equals(currentUserId);
+
+            if (leftIsCurrentUser && !rightIsCurrentUser) {
+                return -1;
+            }
+
+            if (!leftIsCurrentUser && rightIsCurrentUser) {
+                return 1;
+            }
+
+            boolean leftHasMessage = left.getLastMessageTime() != null;
+            boolean rightHasMessage = right.getLastMessageTime() != null;
+
+            if (leftHasMessage && rightHasMessage) {
+                return right.getLastMessageTime().compareTo(left.getLastMessageTime());
+            }
+
+            if (leftHasMessage) {
+                return -1;
+            }
+
+            if (rightHasMessage) {
+                return 1;
+            }
+
+            return left.getPartnerUsername().compareToIgnoreCase(right.getPartnerUsername());
+        });
+
+        return result;
     }
 
 
