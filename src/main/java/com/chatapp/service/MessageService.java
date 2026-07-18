@@ -2,6 +2,7 @@ package com.chatapp.service;
 
 import com.chatapp.Mapper.impl.MessageMapper;
 import com.chatapp.dto.ConversationDto;
+import com.chatapp.dto.EditMessageRequest;
 import com.chatapp.projection.ConversationSummaryProjection;
 import com.chatapp.projection.UnreadCountProjection;
 import com.chatapp.tracker.ActiveChatTracker;
@@ -14,6 +15,7 @@ import com.chatapp.repository.UserRepository;
 import lombok.AllArgsConstructor;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -79,6 +81,41 @@ public class MessageService {
         }
 
         return responseDto;
+    }
+
+    public MessageDto editMessage(EditMessageRequest request, Long authenticatedUserId) {
+
+        if (request.getMessageId() == null) {
+            throw new IllegalArgumentException("Message id is required");
+        }
+
+        String newContent = request.getContent();
+
+        if (newContent == null || newContent.trim().isEmpty()) {
+            throw new IllegalArgumentException("Message content cannot be empty");
+        }
+
+        MessageEntity message = messageRepository.findById(request.getMessageId())
+                .orElseThrow(() -> new IllegalArgumentException("Message not found"));
+
+        if (message.getSender() == null ||
+                message.getSender().getUserId() != authenticatedUserId) {
+            throw new SecurityException("You can only edit your own messages");
+        }
+
+        String normalizedContent = newContent.trim();
+
+        if (normalizedContent.equals(message.getContent())) {
+            throw new IllegalArgumentException("Edited content must be different");
+        }
+
+        message.setContent(normalizedContent);
+        message.setEdited(true);
+        message.setEditedAt(LocalDateTime.now());
+
+        MessageEntity savedMessage = messageRepository.save(message);
+
+        return messageMapper.mapTo(savedMessage);
     }
 
     public List<MessageDto> getHistory() {

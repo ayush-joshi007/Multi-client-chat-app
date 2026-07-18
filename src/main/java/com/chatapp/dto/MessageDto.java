@@ -19,6 +19,8 @@ public class MessageDto {
     private Long receiverId;
     private String userName;
     private LocalDateTime createdAt;
+    private boolean edited;
+    private LocalDateTime editedAt;
     private MessageStatus status;
 
 }

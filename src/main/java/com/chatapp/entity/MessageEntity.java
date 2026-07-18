@@ -34,6 +34,10 @@ public class MessageEntity {
     @CreationTimestamp
     private LocalDateTime createdAt;
 
+    private boolean edited;
+
+    private LocalDateTime editedAt;
+
     @Enumerated(EnumType.STRING)
     private MessageStatus status;
 }

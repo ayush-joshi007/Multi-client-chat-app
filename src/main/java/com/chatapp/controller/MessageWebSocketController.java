@@ -2,6 +2,7 @@ package com.chatapp.controller;
 
 import com.chatapp.service.UserService;
 import com.chatapp.tracker.ActiveChatTracker;
+import com.chatapp.dto.EditMessageRequest;
 import com.chatapp.dto.MessageDto;
 import com.chatapp.service.MessageService;
 import lombok.AllArgsConstructor;
@@ -55,6 +56,32 @@ public class MessageWebSocketController {
                 } else {
                         messagingTemplate.convertAndSend("/topic/user/" + messageDto.getReceiverId(), responseDto);
                         messagingTemplate.convertAndSend("/topic/user/" + messageDto.getSenderId(), responseDto);
+                }
+        }
+
+        @MessageMapping("/edit")
+        public void editMessage(EditMessageRequest request, Principal principal, SimpMessageHeaderAccessor accessor) {
+
+                Principal effectivePrincipal = principal;
+                if (effectivePrincipal == null && accessor != null) {
+                        effectivePrincipal = accessor.getUser();
+                }
+
+                if (effectivePrincipal == null) {
+                        log.warn("Rejected unauthenticated STOMP edit");
+                        throw new MessagingException("Unauthenticated STOMP message");
+                }
+
+                String username = effectivePrincipal.getName();
+                Long authenticatedUserId = userService.getUserIdByUserName(username);
+
+                MessageDto responseDto = messageService.editMessage(request, authenticatedUserId);
+
+                if (responseDto.getReceiverId() == null) {
+                        messagingTemplate.convertAndSend("/topic/messages", responseDto);
+                } else {
+                        messagingTemplate.convertAndSend("/topic/user/" + responseDto.getReceiverId(), responseDto);
+                        messagingTemplate.convertAndSend("/topic/user/" + responseDto.getSenderId(), responseDto);
                 }
         }
 

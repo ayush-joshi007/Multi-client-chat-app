@@ -52,6 +52,113 @@ function renderMessageStatus(timeStampDiv, formattedTime, message) {
     }
 }
 
+function isOwnMessage(message) {
+    const myId = parseInt(localStorage.getItem("userId"));
+
+    return message.senderId === myId;
+}
+
+function startEditingMessage(message) {
+    const editedContent = prompt("Edit message", message.content);
+
+    if (editedContent == null) {
+        return;
+    }
+
+    const trimmedContent = editedContent.trim();
+
+    if (trimmedContent === "" || trimmedContent === message.content) {
+        return;
+    }
+
+    client.publish({
+        destination: "/app/edit",
+        body: JSON.stringify({
+            messageId: message.id,
+            content: trimmedContent
+        })
+    });
+}
+
+function renderMessageActions(messageDiv, message) {
+    let actionsDiv = messageDiv.querySelector(".message-actions");
+
+    if (!isOwnMessage(message)) {
+        if (actionsDiv != null) {
+            actionsDiv.remove();
+        }
+        return;
+    }
+
+    if (actionsDiv != null) {
+        actionsDiv.remove();
+    }
+
+    actionsDiv = document.createElement("div");
+    actionsDiv.classList.add("message-actions");
+
+    const editButton = document.createElement("button");
+    editButton.type = "button";
+    editButton.classList.add("edit-message-btn");
+    editButton.textContent = "Edit";
+
+    editButton.addEventListener("click", function () {
+        startEditingMessage(message);
+    });
+
+    actionsDiv.appendChild(editButton);
+
+    const timeStampDiv = messageDiv.querySelector(".timeStamp");
+
+    if (timeStampDiv == null) {
+        messageDiv.appendChild(actionsDiv);
+    }
+    else {
+        messageDiv.insertBefore(actionsDiv, timeStampDiv);
+    }
+}
+
+function renderMessageText(messageDiv, message) {
+
+    const myName = localStorage.getItem("userName");
+    const editedText = message.edited ? " (edited)" : "";
+    let contentSpan = messageDiv.querySelector(".message-content");
+
+    if (contentSpan == null) {
+        contentSpan = document.createElement("span");
+        contentSpan.classList.add("message-content");
+        messageDiv.insertBefore(contentSpan, messageDiv.firstChild);
+    }
+
+    if (message.userName === myName) {
+        contentSpan.textContent =
+            message.userName + " (You): " + message.content + editedText;
+    }
+    else {
+        contentSpan.textContent =
+            message.userName + ": " + message.content + editedText;
+    }
+
+    renderMessageActions(messageDiv, message);
+}
+
+function updateExistingMessageElement(messageDiv, message) {
+
+    const timeStampDiv = messageDiv.querySelector(".timeStamp");
+
+    renderMessageText(messageDiv, message);
+
+    const formattedTime = new Date(message.createdAt)
+        .toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit"
+        });
+
+    renderMessageStatus(timeStampDiv, formattedTime, message);
+
+    messageDiv.appendChild(timeStampDiv);
+}
+
 function createMessageElement(message) {
 
     const messageDiv = document.createElement("div");
@@ -66,14 +173,12 @@ function createMessageElement(message) {
 
     if (message.userName === myName) {
         messageDiv.classList.add("my-message");
-        messageDiv.textContent =
-            message.userName + " (You): " + message.content;
     }
     else {
         messageDiv.classList.add("other-message");
-        messageDiv.textContent =
-            message.userName + ": " + message.content;
     }
+
+    renderMessageText(messageDiv, message);
 
     const formattedTime = new Date(message.createdAt)
         .toLocaleTimeString([], {
@@ -134,10 +239,19 @@ client.onConnect = () => {
         const messageData = JSON.parse(message.body);
 
         const div = document.getElementById("messages");
-        const messageDiv = createMessageElement(messageData);
+        const existingMessage = document.querySelector(
+            `[data-message-id="${messageData.id}"]`
+        );
 
-        div.appendChild(messageDiv);
-        div.scrollTop = div.scrollHeight;
+        if (existingMessage == null) {
+            const messageDiv = createMessageElement(messageData);
+
+            div.appendChild(messageDiv);
+            div.scrollTop = div.scrollHeight;
+        }
+        else {
+            updateExistingMessageElement(existingMessage, messageData);
+        }
 
         console.log("RECEIVED!", new Date());
     });
@@ -174,16 +288,7 @@ client.onConnect = () => {
 
             }
             else {
-                const timeStampDiv = existingMessage.querySelector(".timeStamp");
-
-                const formattedTime = new Date(messageData.createdAt)
-                    .toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit"
-                    });
-
-                renderMessageStatus(timeStampDiv, formattedTime, messageData);
-
+                updateExistingMessageElement(existingMessage, messageData);
             }
         }
         loadConversations();

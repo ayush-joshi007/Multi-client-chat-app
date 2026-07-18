@@ -170,6 +170,17 @@
     text-align: right;
 }
 
+.message-actions{
+    margin-top: 6px;
+    text-align: right;
+}
+
+.edit-message-btn{
+    cursor: pointer;
+    font-size: 12px;
+    padding: 2px 6px;
+}
+
 .status-tick.read{
     color: #34b7f1;
 }
