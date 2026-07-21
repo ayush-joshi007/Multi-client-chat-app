@@ -2,6 +2,7 @@ package com.chatapp.service;
 
 import com.chatapp.Mapper.impl.MessageMapper;
 import com.chatapp.dto.ConversationDto;
+import com.chatapp.dto.DeleteMessageRequest;
 import com.chatapp.dto.EditMessageRequest;
 import com.chatapp.projection.ConversationSummaryProjection;
 import com.chatapp.projection.UnreadCountProjection;
@@ -25,12 +26,24 @@ import java.util.stream.Collectors;
 @Service
 public class MessageService {
 
+    private static final String DELETED_MESSAGE_PLACEHOLDER = "THIS MESSAGE WAS DELETED.";
+
     private final MessageRepository messageRepository;
     private final UserRepository userRepository;
     private final MessageMapper messageMapper;
     private final PresenceService presenceService;
     private final ActiveChatTracker activeChatTracker;
     private final SimpMessagingTemplate messagingTemplate;
+
+    private MessageDto buildClientMessageDto(MessageEntity messageEntity) {
+        MessageDto dto = messageMapper.mapTo(messageEntity);
+
+        if (messageEntity.isDeleted()) {
+            dto.setContent(DELETED_MESSAGE_PLACEHOLDER);
+        }
+
+        return dto;
+    }
 
     public MessageDto sendMessage(MessageDto messageDto) {
 
@@ -73,14 +86,7 @@ public class MessageService {
 
         MessageEntity savedMessageEntity = messageRepository.save(messageEntity);
 
-        MessageDto responseDto = messageMapper.mapTo(savedMessageEntity);
-
-        if (savedMessageEntity.getSender() != null) {
-            responseDto.setUserName(savedMessageEntity.getSender().getUserName());
-            responseDto.setSenderId(savedMessageEntity.getSender().getUserId());
-        }
-
-        return responseDto;
+        return buildClientMessageDto(savedMessageEntity);
     }
 
     public MessageDto editMessage(EditMessageRequest request, Long authenticatedUserId) {
@@ -103,6 +109,10 @@ public class MessageService {
             throw new SecurityException("You can only edit your own messages");
         }
 
+        if (message.isDeleted()) {
+            throw new IllegalArgumentException("Deleted messages cannot be edited");
+        }
+
         String normalizedContent = newContent.trim();
 
         if (normalizedContent.equals(message.getContent())) {
@@ -115,18 +125,40 @@ public class MessageService {
 
         MessageEntity savedMessage = messageRepository.save(message);
 
-        return messageMapper.mapTo(savedMessage);
+        return buildClientMessageDto(savedMessage);
+    }
+
+    public MessageDto deleteMessage(DeleteMessageRequest request, Long authenticatedUserId) {
+
+        if (request.getMessageId() == null) {
+            throw new IllegalArgumentException("Message id is required");
+        }
+
+        MessageEntity message = messageRepository.findById(request.getMessageId())
+                .orElseThrow(() -> new IllegalArgumentException("Message not found"));
+
+        if (message.getSender() == null ||
+                message.getSender().getUserId() != authenticatedUserId) {
+            throw new SecurityException("You can only delete your own messages");
+        }
+
+        if (message.isDeleted()) {
+            return buildClientMessageDto(message);
+        }
+
+        message.setDeleted(true);
+        message.setDeletedAt(LocalDateTime.now());
+
+        MessageEntity savedMessage = messageRepository.save(message);
+
+        return buildClientMessageDto(savedMessage);
     }
 
     public List<MessageDto> getHistory() {
         Iterable<MessageEntity> result= messageRepository.findByReceiverIsNullOrderByCreatedAt();
         List<MessageDto> li = new ArrayList<>();
         for(MessageEntity m: result){
-            MessageDto msgDto = messageMapper.mapTo(m);
-            if(m.getSender() != null){
-                msgDto.setUserName(m.getSender().getUserName());
-                msgDto.setSenderId(m.getSender().getUserId());
-            }
+            MessageDto msgDto = buildClientMessageDto(m);
             li.add(msgDto);
         }
         return li;
@@ -149,11 +181,7 @@ public class MessageService {
 
             MessageEntity savedMessage = messageRepository.save(message);
 
-            MessageDto dto = messageMapper.mapTo(savedMessage);
-
-            dto.setSenderId(savedMessage.getSender().getUserId());
-            dto.setReceiverId(savedMessage.getReceiver().getUserId());
-            dto.setUserName(savedMessage.getSender().getUserName());
+            MessageDto dto = buildClientMessageDto(savedMessage);
 
             messagingTemplate.convertAndSend(
                     "/topic/user/" + dto.getSenderId(),
@@ -168,16 +196,7 @@ public class MessageService {
 
         for(MessageEntity m : result){
 
-            MessageDto msgDto = messageMapper.mapTo(m);
-
-            if(m.getSender() != null){
-                msgDto.setUserName(m.getSender().getUserName());
-                msgDto.setSenderId(m.getSender().getUserId());
-            }
-
-            if(m.getReceiver() != null){
-                msgDto.setReceiverId(m.getReceiver().getUserId());
-            }
+            MessageDto msgDto = buildClientMessageDto(m);
 
             messages.add(msgDto);
         }
@@ -201,7 +220,7 @@ public class MessageService {
 
             messagingTemplate.convertAndSend(
                     "/topic/user/" + message.getSender().getUserId(),
-                    messageMapper.mapTo(message)
+                    buildClientMessageDto(message)
             );
         }
     }
@@ -248,7 +267,14 @@ public class MessageService {
                     conversationByPartnerId.get(user.getUserId());
 
             if (conversation != null) {
-                dto.setLastMessage(conversation.getLastMessage());
+                boolean lastMessageDeleted = Boolean.TRUE.equals(conversation.getLastMessageDeleted());
+
+                dto.setLastMessageDeleted(lastMessageDeleted);
+                dto.setLastMessage(
+                        lastMessageDeleted
+                                ? DELETED_MESSAGE_PLACEHOLDER
+                                : conversation.getLastMessage()
+                );
                 dto.setLastMessageTime(conversation.getLastMessageTime());
                 dto.setLastSenderId(conversation.getLastSenderId());
             }

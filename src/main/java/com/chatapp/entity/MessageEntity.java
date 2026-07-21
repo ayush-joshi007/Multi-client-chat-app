@@ -38,6 +38,10 @@ public class MessageEntity {
 
     private LocalDateTime editedAt;
 
+    private boolean deleted;
+
+    private LocalDateTime deletedAt;
+
     @Enumerated(EnumType.STRING)
     private MessageStatus status;
 }

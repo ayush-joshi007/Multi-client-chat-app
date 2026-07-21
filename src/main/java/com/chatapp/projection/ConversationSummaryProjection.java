@@ -10,6 +10,8 @@ public interface ConversationSummaryProjection {
 
     String getLastMessage();
 
+    Boolean getLastMessageDeleted();
+
     LocalDateTime getLastMessageTime();
 
     Long getLastSenderId();

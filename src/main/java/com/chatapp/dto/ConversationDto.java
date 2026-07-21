@@ -14,6 +14,7 @@ public class ConversationDto {
     private Long partnerId;
     private String partnerUsername;
     private String lastMessage;
+    private boolean lastMessageDeleted;
     private LocalDateTime lastMessageTime;
     private Long lastSenderId;
     private boolean online;

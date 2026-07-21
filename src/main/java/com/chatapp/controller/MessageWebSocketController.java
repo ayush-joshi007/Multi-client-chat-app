@@ -2,6 +2,7 @@ package com.chatapp.controller;
 
 import com.chatapp.service.UserService;
 import com.chatapp.tracker.ActiveChatTracker;
+import com.chatapp.dto.DeleteMessageRequest;
 import com.chatapp.dto.EditMessageRequest;
 import com.chatapp.dto.MessageDto;
 import com.chatapp.service.MessageService;
@@ -76,6 +77,32 @@ public class MessageWebSocketController {
                 Long authenticatedUserId = userService.getUserIdByUserName(username);
 
                 MessageDto responseDto = messageService.editMessage(request, authenticatedUserId);
+
+                if (responseDto.getReceiverId() == null) {
+                        messagingTemplate.convertAndSend("/topic/messages", responseDto);
+                } else {
+                        messagingTemplate.convertAndSend("/topic/user/" + responseDto.getReceiverId(), responseDto);
+                        messagingTemplate.convertAndSend("/topic/user/" + responseDto.getSenderId(), responseDto);
+                }
+        }
+
+        @MessageMapping("/delete")
+        public void deleteMessage(DeleteMessageRequest request, Principal principal, SimpMessageHeaderAccessor accessor) {
+
+                Principal effectivePrincipal = principal;
+                if (effectivePrincipal == null && accessor != null) {
+                        effectivePrincipal = accessor.getUser();
+                }
+
+                if (effectivePrincipal == null) {
+                        log.warn("Rejected unauthenticated STOMP delete");
+                        throw new MessagingException("Unauthenticated STOMP message");
+                }
+
+                String username = effectivePrincipal.getName();
+                Long authenticatedUserId = userService.getUserIdByUserName(username);
+
+                MessageDto responseDto = messageService.deleteMessage(request, authenticatedUserId);
 
                 if (responseDto.getReceiverId() == null) {
                         messagingTemplate.convertAndSend("/topic/messages", responseDto);

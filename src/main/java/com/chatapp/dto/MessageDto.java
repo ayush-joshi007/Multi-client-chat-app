@@ -21,6 +21,8 @@ public class MessageDto {
     private LocalDateTime createdAt;
     private boolean edited;
     private LocalDateTime editedAt;
+    private boolean deleted;
+    private LocalDateTime deletedAt;
     private MessageStatus status;
 
 }

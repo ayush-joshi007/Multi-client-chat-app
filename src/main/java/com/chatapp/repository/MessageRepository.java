@@ -59,6 +59,7 @@ public interface MessageRepository extends CrudRepository<MessageEntity, Long> {
             ranked.partner_id AS "partnerId",
             u.user_name AS "partnerUsername",
             ranked.content AS "lastMessage",
+            ranked.deleted AS "lastMessageDeleted",
             ranked.created_at AS "lastMessageTime",
             ranked.sender_id AS "lastSenderId"
         FROM (

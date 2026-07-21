@@ -94,6 +94,10 @@ function renderMessageActions(messageDiv, message) {
         actionsDiv.remove();
     }
 
+    if (message.deleted) {
+        return;
+    }
+
     actionsDiv = document.createElement("div");
     actionsDiv.classList.add("message-actions");
 
@@ -106,7 +110,17 @@ function renderMessageActions(messageDiv, message) {
         startEditingMessage(message);
     });
 
+    const deleteButton = document.createElement("button");
+    deleteButton.type = "button";
+    deleteButton.classList.add("delete-message-btn");
+    deleteButton.textContent = "Delete";
+
+    deleteButton.addEventListener("click", function () {
+        startDeletingMessage(message);
+    });
+
     actionsDiv.appendChild(editButton);
+    actionsDiv.appendChild(deleteButton);
 
     const timeStampDiv = messageDiv.querySelector(".timeStamp");
 
@@ -137,6 +151,13 @@ function renderMessageText(messageDiv, message) {
     else {
         contentSpan.textContent =
             message.userName + ": " + message.content + editedText;
+    }
+
+    if (message.deleted) {
+        contentSpan.classList.add("deleted-message");
+    }
+    else {
+        contentSpan.classList.remove("deleted-message");
     }
 
     renderMessageActions(messageDiv, message);
@@ -506,5 +527,23 @@ function loadConversations(){
         }
     })
     .catch(error => console.error('Error:', error));
+}
+
+
+function startDeletingMessage(message) {
+
+    const confirmed = window.confirm("Delete this message?");
+
+    if (!confirmed) {
+        return;
+    }
+
+    client.publish({
+        destination: "/app/delete",
+        body: JSON.stringify({
+            messageId: message.id
+        })
+    });
+
 }
 
