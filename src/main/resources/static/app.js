@@ -1,4 +1,9 @@
 let selectedUserId = null;
+let currentPage = 0;
+let isLoadingMessages = false;
+let hasMoreMessages = true;
+const PAGE_SIZE = 20;
+
 const token = localStorage.getItem("token");
 
 if (!token) {
@@ -214,38 +219,99 @@ function createMessageElement(message) {
     return messageDiv;
 }
 
-function loadMessages(){
+function fetchMessages(page = 0) {
+    console.log(`[PAGINATION LOG] 1. fetchMessages() called for page = ${page}. Current state -> isLoadingMessages: ${isLoadingMessages}, hasMoreMessages: ${hasMoreMessages}, currentPage: ${currentPage}`);
+    
+    if (isLoadingMessages) {
+        console.warn(`[PAGINATION LOG] Aborting fetchMessages(${page}) because isLoadingMessages is true.`);
+        return;
+    }
+    isLoadingMessages = true;
+    console.log(`[PAGINATION LOG] Set isLoadingMessages = true`);
 
-    console.log("LOAD MESSAGES CALLED", new Date());
+    const chatWindow = document.getElementById("messages");
+    const myId = localStorage.getItem("userId");
 
-    const div = document.getElementById("messages");
-    div.innerHTML = "";
+    const url = selectedUserId == null
+        ? `http://localhost:8080/messages?page=${page}&size=${PAGE_SIZE}`
+        : `http://localhost:8080/messages/private?senderId=${myId}&receiverId=${selectedUserId}&page=${page}&size=${PAGE_SIZE}`;
 
-    fetch('http://localhost:8080/messages', {
+    const oldScrollHeight = chatWindow.scrollHeight;
+    console.log(`[PAGINATION LOG] Requesting URL: ${url}. Element measurements before fetch -> scrollHeight: ${oldScrollHeight}, clientHeight: ${chatWindow.clientHeight}, scrollTop: ${chatWindow.scrollTop}`);
+
+    fetch(url, {
         headers: {
             Authorization: `Bearer ${token}`
         }
     })
         .then(response => response.json())
-        .then(data =>{
-            let lastSender = null;
+        .then(data => {
+            console.log(`[PAGINATION LOG] 2. Server Response received for page ${page}:`, data);
+            
+            const messages = data.content || [];
+            hasMoreMessages = data.hasNext !== undefined ? data.hasNext : !data.last;
+            currentPage = page;
 
-            for(const msg of data){
+            console.log(`[PAGINATION LOG] State updated -> messages returned count: ${messages.length}, data.hasNext: ${data.hasNext}, data.last: ${data.last}, updated hasMoreMessages: ${hasMoreMessages}, updated currentPage: ${currentPage}`);
 
-                const messageDiv = createMessageElement(msg);
+            if (page === 0) {
+                chatWindow.innerHTML = "";
+                let lastSender = null;
 
-                if(lastSender !== msg.userName){
-                    messageDiv.style.marginTop = "20px";
+                for (const msg of messages) {
+                    if (document.querySelector(`[data-message-id="${msg.id}"]`)) continue;
+
+                    const messageDiv = createMessageElement(msg);
+
+                    if (lastSender !== msg.userName) {
+                        messageDiv.style.marginTop = "20px";
+                    }
+
+                    lastSender = msg.userName;
+                    chatWindow.appendChild(messageDiv);
                 }
 
-                lastSender = msg.userName;
+                chatWindow.scrollTop = chatWindow.scrollHeight;
+                console.log(`[PAGINATION LOG] Page 0 rendered. Post-render measurements -> scrollHeight: ${chatWindow.scrollHeight}, clientHeight: ${chatWindow.clientHeight}, scrollTop: ${chatWindow.scrollTop}, isOverflowing: ${chatWindow.scrollHeight > chatWindow.clientHeight}`);
+            } else {
+                const fragment = document.createDocumentFragment();
+                let lastSender = null;
 
-                div.appendChild(messageDiv);
+                for (const msg of messages) {
+                    if (document.querySelector(`[data-message-id="${msg.id}"]`)) continue;
+
+                    const messageDiv = createMessageElement(msg);
+
+                    if (lastSender !== msg.userName) {
+                        messageDiv.style.marginTop = "20px";
+                    }
+
+                    lastSender = msg.userName;
+                    fragment.appendChild(messageDiv);
+                }
+
+                chatWindow.insertBefore(fragment, chatWindow.firstChild);
+
+                chatWindow.scrollTop = chatWindow.scrollHeight - oldScrollHeight;
+                console.log(`[PAGINATION LOG] Page ${page} prepended. Post-prepended measurements -> new scrollHeight: ${chatWindow.scrollHeight}, oldScrollHeight: ${oldScrollHeight}, new scrollTop: ${chatWindow.scrollTop}`);
             }
 
-            div.scrollTop = div.scrollHeight;
+            if (selectedUserId != null && page === 0) {
+                loadConversations();
+            }
         })
-        .catch(error => console.error('Error:', error));
+        .catch(error => console.error("[PAGINATION LOG] Error loading messages:", error))
+        .finally(() => {
+            isLoadingMessages = false;
+            console.log(`[PAGINATION LOG] Set isLoadingMessages = false`);
+        });
+}
+
+function loadMessages() {
+    console.log("LOAD MESSAGES CALLED", new Date());
+    currentPage = 0;
+    hasMoreMessages = true;
+    fetchMessages(0);
 }
 
 client.onConnect = () => {
@@ -393,42 +459,10 @@ function formatConversationTime(lastMessageTime) {
 
 function openPrivateConversation(partnerId) {
     selectedUserId = partnerId;
+    currentPage = 0;
+    hasMoreMessages = true;
 
-    const chatWindow = document.getElementById("messages");
-    const myId = localStorage.getItem("userId");
-    chatWindow.innerHTML = "";
-
-    fetch(
-        `http://localhost:8080/messages/private?senderId=${myId}&receiverId=${selectedUserId}`,
-        {
-            headers:{
-                Authorization: `Bearer ${token}`
-            }
-        }
-    )
-    .then(response => response.json())
-    .then(data => {
-
-        let lastSender = null;
-
-        data.forEach(message => {
-
-            const messageDiv = createMessageElement(message);
-
-            if(lastSender !== message.userName){
-                messageDiv.style.marginTop = "20px";
-            }
-
-            lastSender = message.userName;
-
-            chatWindow.appendChild(messageDiv);
-
-        });
-
-        chatWindow.scrollTop = chatWindow.scrollHeight;
-
-        loadConversations();
-    });
+    fetchMessages(0);
 
     console.log(selectedUserId);
 }
@@ -546,4 +580,18 @@ function startDeletingMessage(message) {
     });
 
 }
+
+const messagesContainer = document.getElementById("messages");
+if (messagesContainer) {
+    console.log("[PAGINATION LOG] Attaching scroll event listener to #messages container");
+    messagesContainer.addEventListener("scroll", function () {
+        console.log(`[PAGINATION LOG] Scroll event fired! scrollTop: ${messagesContainer.scrollTop}, hasMoreMessages: ${hasMoreMessages}, isLoadingMessages: ${isLoadingMessages}, condition (scrollTop <= 30 && hasMoreMessages && !isLoadingMessages): ${messagesContainer.scrollTop <= 30 && hasMoreMessages && !isLoadingMessages}`);
+        
+        if (messagesContainer.scrollTop <= 30 && hasMoreMessages && !isLoadingMessages) {
+            console.log(`[PAGINATION LOG] Triggering fetchMessages(page = ${currentPage + 1}) from scroll event!`);
+            fetchMessages(currentPage + 1);
+        }
+    });
+}
+
 

@@ -14,10 +14,14 @@ import com.chatapp.entity.UserEntity;
 import com.chatapp.repository.MessageRepository;
 import com.chatapp.repository.UserRepository;
 import lombok.AllArgsConstructor;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
+import org.springframework.data.domain.SliceImpl;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -154,17 +158,18 @@ public class MessageService {
         return buildClientMessageDto(savedMessage);
     }
 
-    public List<MessageDto> getHistory() {
-        Iterable<MessageEntity> result= messageRepository.findByReceiverIsNullOrderByCreatedAt();
-        List<MessageDto> li = new ArrayList<>();
-        for(MessageEntity m: result){
+    public Slice<MessageDto> getHistory(Pageable pageable) {
+        Slice<MessageEntity> sliceResult = messageRepository.findByReceiverIsNull(pageable);
+        List<MessageDto> messages = new ArrayList<>();
+        for (MessageEntity m : sliceResult.getContent()) {
             MessageDto msgDto = buildClientMessageDto(m);
-            li.add(msgDto);
+            messages.add(msgDto);
         }
-        return li;
+        Collections.reverse(messages);
+        return new SliceImpl<>(messages, pageable, sliceResult.hasNext());
     }
 
-    public List<MessageDto> getPrivateHistory(Long senderId, Long receiverId){
+    public Slice<MessageDto> getPrivateHistory(Long senderId, Long receiverId, Pageable pageable) {
 
         activeChatTracker.getActiveChats().put(senderId, receiverId);
 
@@ -189,19 +194,20 @@ public class MessageService {
             );
         }
 
-
-        List<MessageEntity> result = messageRepository.findPrivateConversation(senderId, receiverId);
+        Slice<MessageEntity> sliceResult = messageRepository.findPrivateConversation(senderId, receiverId, pageable);
 
         List<MessageDto> messages = new ArrayList<>();
 
-        for(MessageEntity m : result){
+        for (MessageEntity m : sliceResult.getContent()) {
 
             MessageDto msgDto = buildClientMessageDto(m);
 
             messages.add(msgDto);
         }
 
-        return messages;
+        Collections.reverse(messages);
+
+        return new SliceImpl<>(messages, pageable, sliceResult.hasNext());
     }
 
     public void markPendingMessagesAsDelivered(Long receiverId){

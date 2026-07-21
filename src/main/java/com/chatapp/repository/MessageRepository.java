@@ -4,6 +4,8 @@ import com.chatapp.entity.MessageEntity;
 import com.chatapp.entity.MessageStatus;
 import com.chatapp.projection.ConversationSummaryProjection;
 import com.chatapp.projection.UnreadCountProjection;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.CrudRepository;
 import org.springframework.data.repository.query.Param;
@@ -14,7 +16,7 @@ import java.util.List;
 @Repository
 public interface MessageRepository extends CrudRepository<MessageEntity, Long> {
 
-    Iterable<MessageEntity> findByReceiverIsNullOrderByCreatedAt();
+    Slice<MessageEntity> findByReceiverIsNull(Pageable pageable);
 
     @Query("""
         SELECT m
@@ -25,10 +27,12 @@ public interface MessageRepository extends CrudRepository<MessageEntity, Long> {
         OR
             (m.sender.userId = :user2Id
              AND m.receiver.userId = :user1Id)
-        ORDER BY m.createdAt
     """)
-    List<MessageEntity> findPrivateConversation(@Param("user1Id") Long user1Id, @Param("user2Id") Long user2Id);
-
+    Slice<MessageEntity> findPrivateConversation(
+            @Param("user1Id") Long user1Id,
+            @Param("user2Id") Long user2Id,
+            Pageable pageable
+    );
 
     List<MessageEntity> findBySenderUserIdAndReceiverUserIdAndStatus(
             Long senderId,
@@ -52,7 +56,6 @@ public interface MessageRepository extends CrudRepository<MessageEntity, Long> {
         GROUP BY m.sender.userId
     """)
     List<UnreadCountProjection> findUnreadCountsByReceiverId(@Param("receiverId") Long receiverId);
-
 
     @Query(value = """
         SELECT
@@ -93,6 +96,4 @@ public interface MessageRepository extends CrudRepository<MessageEntity, Long> {
     List<ConversationSummaryProjection> findConversationSummaries(
             @Param("currentUserId") Long currentUserId
     );
-
-
 }

@@ -5,6 +5,10 @@ import com.chatapp.projection.UnreadCountProjection;
 import com.chatapp.service.MessageService;
 import com.chatapp.service.UserService;
 import lombok.AllArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
+import org.springframework.data.domain.Sort;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -16,21 +20,35 @@ import java.util.List;
 @RestController
 public class MessageRestController {
 
-    private MessageService messageService;
-    private UserService userService;
-
+    private final MessageService messageService;
+    private final UserService userService;
 
     @GetMapping("/messages")
-    public List<MessageDto> getMessages(){
-        return messageService.getHistory();
+    public Slice<MessageDto> getMessages(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+
+        Sort sort = Sort.by(Sort.Direction.DESC, "createdAt")
+                .and(Sort.by(Sort.Direction.DESC, "id"));
+
+        Pageable pageable = PageRequest.of(page, size, sort);
+
+        return messageService.getHistory(pageable);
     }
 
     @GetMapping("/messages/private")
-    public List<MessageDto> getPrivateMessages(
+    public Slice<MessageDto> getPrivateMessages(
             @RequestParam Long senderId,
-            @RequestParam Long receiverId){
+            @RequestParam Long receiverId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
 
-        return messageService.getPrivateHistory(senderId, receiverId);
+        Sort sort = Sort.by(Sort.Direction.DESC, "createdAt")
+                .and(Sort.by(Sort.Direction.DESC, "id"));
+
+        Pageable pageable = PageRequest.of(page, size, sort);
+
+        return messageService.getPrivateHistory(senderId, receiverId, pageable);
     }
 
     @GetMapping("/messages/unread-counts")
