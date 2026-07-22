@@ -1,7 +1,10 @@
 let selectedUserId = null;
+let selectedUserName = null;
 let currentPage = 0;
 let isLoadingMessages = false;
 let hasMoreMessages = true;
+let typingTimeoutId = null;
+let typingStarted = false;
 const PAGE_SIZE = 20;
 
 const token = localStorage.getItem("token");
@@ -314,6 +317,105 @@ function loadMessages() {
     fetchMessages(0);
 }
 
+function findConversationPreview(partnerId) {
+    return document.querySelector(
+        `.conversation-preview[data-partner-id="${partnerId}"]`
+    );
+}
+
+function showTypingPreview(senderId) {
+    const previewDiv = findConversationPreview(senderId);
+
+    if (previewDiv == null) {
+        return;
+    }
+
+    if (!previewDiv.classList.contains("typing-preview")) {
+        previewDiv.dataset.originalPreview = previewDiv.textContent;
+    }
+
+    previewDiv.textContent = "typing...";
+    previewDiv.classList.add("typing-preview");
+}
+
+function hideTypingPreview(senderId) {
+    const previewDiv = findConversationPreview(senderId);
+
+    if (previewDiv == null) {
+        return;
+    }
+
+    if (previewDiv.dataset.originalPreview != null) {
+        previewDiv.textContent = previewDiv.dataset.originalPreview;
+        delete previewDiv.dataset.originalPreview;
+    }
+
+    previewDiv.classList.remove("typing-preview");
+}
+
+function clearTypingPreviews() {
+    const typingPreviews = document.querySelectorAll(".conversation-preview.typing-preview");
+
+    typingPreviews.forEach(function (previewDiv) {
+        if (previewDiv.dataset.originalPreview != null) {
+            previewDiv.textContent = previewDiv.dataset.originalPreview;
+            delete previewDiv.dataset.originalPreview;
+        }
+
+        previewDiv.classList.remove("typing-preview");
+    });
+}
+
+function sendTypingStatus(typing) {
+    if (selectedUserId == null || !client.connected) {
+        return false;
+    }
+
+    client.publish({
+        destination: "/app/typing",
+        body: JSON.stringify({
+            senderId: parseInt(localStorage.getItem("userId")),
+            receiverId: selectedUserId,
+            typing: typing
+        })
+    });
+
+    return true;
+}
+
+function stopTyping() {
+    if (typingTimeoutId != null) {
+        clearTimeout(typingTimeoutId);
+        typingTimeoutId = null;
+    }
+
+    if (!typingStarted) {
+        return;
+    }
+
+    sendTypingStatus(false);
+    typingStarted = false;
+}
+
+function handleTypingKeydown() {
+    if (selectedUserId == null) {
+        stopTyping();
+        return;
+    }
+
+    if (!typingStarted) {
+        typingStarted = sendTypingStatus(true);
+    }
+
+    if (typingTimeoutId != null) {
+        clearTimeout(typingTimeoutId);
+    }
+
+    typingTimeoutId = setTimeout(function () {
+        stopTyping();
+    }, 1000);
+}
+
 client.onConnect = () => {
 
     console.log("CONNECTED", new Date());
@@ -362,6 +464,10 @@ client.onConnect = () => {
 
             const div = document.getElementById("messages");
 
+            if (messageData.senderId === selectedUserId) {
+                hideTypingPreview(messageData.senderId);
+            }
+
             const existingMessage = document.querySelector(
                 `[data-message-id="${messageData.id}"]`
             );
@@ -391,14 +497,31 @@ client.onConnect = () => {
         }
     );
 
+    client.subscribe('/topic/typing/' + localStorage.getItem("userId"), function(message) {
+        const typingData = JSON.parse(message.body);
+
+        if (typingData.senderId !== selectedUserId) {
+            return;
+        }
+
+        if (!typingData.typing) {
+            hideTypingPreview(typingData.senderId);
+            return;
+        }
+
+        showTypingPreview(typingData.senderId);
+    });
+
     console.log("Connected!");
 };
 
 client.onWebSocketClose = () => {
+    stopTyping();
     console.log("WEBSOCKET CLOSED", new Date());
 };
 
 client.onDisconnect = () => {
+    stopTyping();
     console.log("DISCONNECTED", new Date());
 };
 
@@ -413,7 +536,16 @@ message.addEventListener("keydown", function (event){
         let sendButton = document.getElementById("send");
         sendButton.click();
     }
-})
+});
+
+message.addEventListener("input", function () {
+    if (message.value.trim() === "") {
+        stopTyping();
+        return;
+    }
+
+    handleTypingKeydown();
+});
 
 sendButton.addEventListener("click", function (){
     const messageBox = document.getElementById("message");
@@ -431,6 +563,7 @@ sendButton.addEventListener("click", function (){
         destination: '/app/send',
         body: contentJson
     });
+    stopTyping();
     messageBox.value='';
 
 })
@@ -457,10 +590,13 @@ function formatConversationTime(lastMessageTime) {
         });
 }
 
-function openPrivateConversation(partnerId) {
+function openPrivateConversation(partnerId, partnerUsername) {
+    stopTyping();
     selectedUserId = partnerId;
+    selectedUserName = partnerUsername;
     currentPage = 0;
     hasMoreMessages = true;
+    clearTypingPreviews();
 
     fetchMessages(0);
 
@@ -474,7 +610,10 @@ function createPublicChatElement() {
     publicDiv.textContent = "Public Chat";
     publicDiv.addEventListener("click", function(){
 
+        stopTyping();
         selectedUserId = null;
+        selectedUserName = null;
+        clearTypingPreviews();
 
         client.publish({
             destination: "/app/leaveChat"
@@ -502,6 +641,7 @@ function createConversationElement(conversation) {
     statusSpan.classList.add("status-dot");
     timeSpan.classList.add("conversation-time");
     previewDiv.classList.add("conversation-preview");
+    previewDiv.dataset.partnerId = conversation.partnerId;
 
     statusSpan.classList.add(conversation.online ? "online" : "offline");
 
@@ -537,7 +677,7 @@ function createConversationElement(conversation) {
     conversationDiv.appendChild(previewDiv);
 
     conversationDiv.addEventListener("click", function (){
-        openPrivateConversation(conversation.partnerId);
+        openPrivateConversation(conversation.partnerId, conversation.partnerUsername);
     });
 
     return conversationDiv;

@@ -5,6 +5,7 @@ import com.chatapp.tracker.ActiveChatTracker;
 import com.chatapp.dto.DeleteMessageRequest;
 import com.chatapp.dto.EditMessageRequest;
 import com.chatapp.dto.MessageDto;
+import com.chatapp.dto.TypingDto;
 import com.chatapp.service.MessageService;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -110,6 +111,34 @@ public class MessageWebSocketController {
                         messagingTemplate.convertAndSend("/topic/user/" + responseDto.getReceiverId(), responseDto);
                         messagingTemplate.convertAndSend("/topic/user/" + responseDto.getSenderId(), responseDto);
                 }
+        }
+
+        @MessageMapping("/typing")
+        public void typing(TypingDto typingDto, Principal principal, SimpMessageHeaderAccessor accessor) {
+
+                Principal effectivePrincipal = principal;
+                if (effectivePrincipal == null && accessor != null) {
+                        effectivePrincipal = accessor.getUser();
+                }
+
+                if (effectivePrincipal == null) {
+                        log.warn("Rejected unauthenticated STOMP typing event");
+                        throw new MessagingException("Unauthenticated STOMP message");
+                }
+
+                String username = effectivePrincipal.getName();
+                Long senderId = userService.getUserIdByUserName(username);
+
+                typingDto.setSenderId(senderId);
+
+                if (typingDto.getReceiverId() == null) {
+                        return;
+                }
+
+                messagingTemplate.convertAndSend(
+                        "/topic/typing/" + typingDto.getReceiverId(),
+                        typingDto
+                );
         }
 
         @MessageMapping("/leaveChat")
