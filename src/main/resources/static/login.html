@@ -2,40 +2,53 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>login</title>
+    <title>Relay | Login</title>
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
     <link rel="stylesheet" href="style.css">
 </head>
-<body class="login-page">
-<div id="login-box" >
-    <p id="responseMessage"></p>
-    <div id="left"></div>
-    <div id="loginWindow">
-        <br>
-        <br>
-        <h1>LOGIN</h1>
-        <br>
-        <br>
+<body>
 
-        <label for="userName">Username: </label>
-        <input type="text" id="userName" placeholder="Username">
-        <br>
-        <br>
-        <br>
+<header class="app-header">
+    <img src="relay-main.png"
+         alt="Relay"
+         class="app-logo">
+</header>
 
-        <label for="password">Password: </label>
-        <input type="password" id="password" placeholder="Password">
-        <br>
-        <br>
-        <br>
-        <br>
+<div class="login-page">
 
-        <button id="loginBtn">Login</button><br><br><br>
-        <span>Don't have an account? </span>
-        <button id="registerBtn">Register</button>
+    <div id="login-box">
 
+        <p id="responseMessage"></p>
+
+        <div id="loginWindow">
+
+            <h1>Welcome back</h1>
+
+            <p class="auth-subtitle">
+                Sign in to continue your conversations.
+            </p>
+
+            <div class="auth-field">
+                <label for="userName">Username</label>
+                <input type="text" id="userName" placeholder="Username">
+            </div>
+
+            <div class="auth-field">
+                <label for="password">Password</label>
+                <input type="password" id="password" placeholder="Password">
+            </div>
+
+            <button id="loginBtn">Login</button>
+
+            <div class="auth-switch">
+                <span>Don't have an account?</span>
+                <button id="registerBtn">Register</button>
+            </div>
+
+        </div>
 
     </div>
-    <div id="right"></div>
+
 </div>
 
     <script>
@@ -62,14 +75,16 @@
                 return response.json();
             }).then(data => {
                 const response = document.getElementById("responseMessage");
+                response.className = "success";
                 response.textContent = "Login Successful!";
                localStorage.setItem("userId", data.userId);
                localStorage.setItem("userName", data.userName);
                localStorage.setItem("token", data.token);
                window.location.href = "index.html";
             }).catch(error => {
-                document.getElementById("responseMessage").textContent =
-                    error.message;
+                const response = document.getElementById("responseMessage");
+                response.className = "error";
+                response.textContent = error.message;
             });
         });
 

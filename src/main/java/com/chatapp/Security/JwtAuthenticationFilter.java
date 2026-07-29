@@ -2,6 +2,7 @@ package com.chatapp.Security;
 
 
 import com.chatapp.service.CustomUserDetailsService;
+import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -35,11 +36,27 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String jwt = authHeader.substring(7);
 
-        String userName = jwtService.extractUserName(jwt);
+        String userName;
+        try {
+            userName = jwtService.extractUserName(jwt);
+        } catch (JwtException | IllegalArgumentException e) {
+            SecurityContextHolder.clearContext();
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            return;
+        }
 
         if(userName != null && (SecurityContextHolder.getContext().getAuthentication()==null)){
             UserDetails userDetails = userDetailsService.loadUserByUsername(userName);
-            if(jwtService.isTokenValid(jwt, userName)){
+            boolean tokenValid;
+            try {
+                tokenValid = jwtService.isTokenValid(jwt, userName);
+            } catch (JwtException | IllegalArgumentException e) {
+                SecurityContextHolder.clearContext();
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                return;
+            }
+
+            if(tokenValid){
                 Authentication auth = new UsernamePasswordAuthenticationToken(
                                 userDetails,
                                 null,

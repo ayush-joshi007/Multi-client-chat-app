@@ -36,7 +36,9 @@ public class SecurityConfig {
                                 "/register.html",
                                 "/app.js",
                                 "/style.css",
-                                "/auth/**"
+                                "/auth/**",
+                                "/favicon.ico",
+                                "/relay-main.png"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )

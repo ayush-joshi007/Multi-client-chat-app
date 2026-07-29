@@ -6,21 +6,112 @@ let hasMoreMessages = true;
 let typingTimeoutId = null;
 let typingStarted = false;
 const PAGE_SIZE = 20;
+const DEBUG = false;
+
+document.body.style.visibility = "hidden";
 
 const token = localStorage.getItem("token");
 
-if (!token) {
-    window.location.href = "/login.html";
+let client = null;
+const websocketProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+
+function debugLog(...args) {
+    if (DEBUG) {
+        console.log(...args);
+    }
 }
 
-const client = new StompJs.Client({
-    brokerURL: 'ws://localhost:8080/ws',
+function debugWarn(...args) {
+    if (DEBUG) {
+        console.warn(...args);
+    }
+}
+
+function redirectToLogin() {
+    localStorage.clear();
+
+    if (client != null && client.connected) {
+        client.deactivate();
+    }
+
+    window.location.replace("/login.html");
+}
+
+function parseJwtPayload(jwt) {
+    const payload = jwt.split(".")[1];
+    const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const jsonPayload = decodeURIComponent(
+        atob(base64)
+            .split("")
+            .map(function (char) {
+                return "%" + ("00" + char.charCodeAt(0).toString(16)).slice(-2);
+            })
+            .join("")
+    );
+
+    return JSON.parse(jsonPayload);
+}
+
+function isTokenExpired(jwt) {
+    try {
+        const payload = parseJwtPayload(jwt);
+
+        if (payload.exp == null) {
+            return true;
+        }
+
+        return payload.exp * 1000 <= Date.now();
+    } catch (error) {
+        return true;
+    }
+}
+
+function authenticatedFetch(url, options = {}) {
+    const headers = {
+        ...(options.headers || {}),
+        Authorization: `Bearer ${token}`
+    };
+
+    return fetch(url, {
+        ...options,
+        headers: headers
+    }).then(response => {
+        if (response.status === 401 || response.status === 403) {
+            redirectToLogin();
+            throw new Error("Authentication expired");
+        }
+
+        if (!response.ok) {
+            throw new Error("Request failed with status " + response.status);
+        }
+
+        return response;
+    });
+}
+
+function validateStoredSession() {
+    if (!token || isTokenExpired(token)) {
+        redirectToLogin();
+        return Promise.reject(new Error("Missing or expired token"));
+    }
+
+    return authenticatedFetch("/conversations")
+        .then(response => response.json());
+}
+
+if (!token) {
+    redirectToLogin();
+    throw new Error("Missing authentication token");
+}
+
+client = new StompJs.Client({
+    brokerURL: `${websocketProtocol}//${window.location.host}/ws`,
     connectHeaders: {
         Authorization: `Bearer ${token}`
     }
 });
 
-console.log("app.js loaded");
+debugLog("app.js loaded");
 
 function renderMessageStatus(timeStampDiv, formattedTime, message) {
 
@@ -222,43 +313,98 @@ function createMessageElement(message) {
     return messageDiv;
 }
 
+function removeChatStateElements(chatWindow) {
+    chatWindow
+        .querySelectorAll(".chat-empty-state, .chat-loading-state, .chat-error-state")
+        .forEach(function (stateElement) {
+            stateElement.remove();
+        });
+}
+
+function removeChatLoadingElements(chatWindow) {
+    chatWindow
+        .querySelectorAll(".chat-loading-state")
+        .forEach(function (loadingElement) {
+            loadingElement.remove();
+        });
+}
+
+function renderChatLoading(chatWindow, page) {
+    const loadingDiv = document.createElement("div");
+
+    loadingDiv.classList.add("chat-loading-state");
+    loadingDiv.textContent = page === 0 ? "Loading messages..." : "Loading older messages...";
+
+    if (page === 0) {
+        chatWindow.innerHTML = "";
+        chatWindow.appendChild(loadingDiv);
+        return;
+    }
+
+    chatWindow.insertBefore(loadingDiv, chatWindow.firstChild);
+}
+
+function renderChatEmptyState(chatWindow) {
+    const emptyDiv = document.createElement("div");
+
+    emptyDiv.classList.add("chat-empty-state");
+    emptyDiv.textContent = selectedUserId == null
+        ? "No public messages yet. Start the conversation."
+        : `No messages with ${selectedUserName} yet.`;
+
+    chatWindow.appendChild(emptyDiv);
+}
+
+function renderChatErrorState(chatWindow) {
+    const errorDiv = document.createElement("div");
+
+    errorDiv.classList.add("chat-error-state");
+    errorDiv.textContent = "Messages could not be loaded. Please try again.";
+
+    chatWindow.innerHTML = "";
+    chatWindow.appendChild(errorDiv);
+}
+
 function fetchMessages(page = 0) {
-    console.log(`[PAGINATION LOG] 1. fetchMessages() called for page = ${page}. Current state -> isLoadingMessages: ${isLoadingMessages}, hasMoreMessages: ${hasMoreMessages}, currentPage: ${currentPage}`);
+    debugLog(`[PAGINATION LOG] 1. fetchMessages() called for page = ${page}. Current state -> isLoadingMessages: ${isLoadingMessages}, hasMoreMessages: ${hasMoreMessages}, currentPage: ${currentPage}`);
     
     if (isLoadingMessages) {
-        console.warn(`[PAGINATION LOG] Aborting fetchMessages(${page}) because isLoadingMessages is true.`);
+        debugWarn(`[PAGINATION LOG] Aborting fetchMessages(${page}) because isLoadingMessages is true.`);
         return;
     }
     isLoadingMessages = true;
-    console.log(`[PAGINATION LOG] Set isLoadingMessages = true`);
+    debugLog(`[PAGINATION LOG] Set isLoadingMessages = true`);
 
     const chatWindow = document.getElementById("messages");
     const myId = localStorage.getItem("userId");
 
     const url = selectedUserId == null
-        ? `http://localhost:8080/messages?page=${page}&size=${PAGE_SIZE}`
-        : `http://localhost:8080/messages/private?senderId=${myId}&receiverId=${selectedUserId}&page=${page}&size=${PAGE_SIZE}`;
+        ? `/messages?page=${page}&size=${PAGE_SIZE}`
+        : `/messages/private?senderId=${myId}&receiverId=${selectedUserId}&page=${page}&size=${PAGE_SIZE}`;
 
     const oldScrollHeight = chatWindow.scrollHeight;
-    console.log(`[PAGINATION LOG] Requesting URL: ${url}. Element measurements before fetch -> scrollHeight: ${oldScrollHeight}, clientHeight: ${chatWindow.clientHeight}, scrollTop: ${chatWindow.scrollTop}`);
+    renderChatLoading(chatWindow, page);
+    debugLog(`[PAGINATION LOG] Requesting URL: ${url}. Element measurements before fetch -> scrollHeight: ${oldScrollHeight}, clientHeight: ${chatWindow.clientHeight}, scrollTop: ${chatWindow.scrollTop}`);
 
-    fetch(url, {
-        headers: {
-            Authorization: `Bearer ${token}`
-        }
-    })
+    authenticatedFetch(url)
         .then(response => response.json())
         .then(data => {
-            console.log(`[PAGINATION LOG] 2. Server Response received for page ${page}:`, data);
+            debugLog(`[PAGINATION LOG] 2. Server Response received for page ${page}:`, data);
             
             const messages = data.content || [];
             hasMoreMessages = data.hasNext !== undefined ? data.hasNext : !data.last;
             currentPage = page;
 
-            console.log(`[PAGINATION LOG] State updated -> messages returned count: ${messages.length}, data.hasNext: ${data.hasNext}, data.last: ${data.last}, updated hasMoreMessages: ${hasMoreMessages}, updated currentPage: ${currentPage}`);
+            debugLog(`[PAGINATION LOG] State updated -> messages returned count: ${messages.length}, data.hasNext: ${data.hasNext}, data.last: ${data.last}, updated hasMoreMessages: ${hasMoreMessages}, updated currentPage: ${currentPage}`);
 
             if (page === 0) {
                 chatWindow.innerHTML = "";
+
+                if (messages.length === 0) {
+                    renderChatEmptyState(chatWindow);
+                    return;
+                }
+
                 let lastSender = null;
 
                 for (const msg of messages) {
@@ -275,8 +421,10 @@ function fetchMessages(page = 0) {
                 }
 
                 chatWindow.scrollTop = chatWindow.scrollHeight;
-                console.log(`[PAGINATION LOG] Page 0 rendered. Post-render measurements -> scrollHeight: ${chatWindow.scrollHeight}, clientHeight: ${chatWindow.clientHeight}, scrollTop: ${chatWindow.scrollTop}, isOverflowing: ${chatWindow.scrollHeight > chatWindow.clientHeight}`);
+                debugLog(`[PAGINATION LOG] Page 0 rendered. Post-render measurements -> scrollHeight: ${chatWindow.scrollHeight}, clientHeight: ${chatWindow.clientHeight}, scrollTop: ${chatWindow.scrollTop}, isOverflowing: ${chatWindow.scrollHeight > chatWindow.clientHeight}`);
             } else {
+                removeChatStateElements(chatWindow);
+
                 const fragment = document.createDocumentFragment();
                 let lastSender = null;
 
@@ -296,22 +444,32 @@ function fetchMessages(page = 0) {
                 chatWindow.insertBefore(fragment, chatWindow.firstChild);
 
                 chatWindow.scrollTop = chatWindow.scrollHeight - oldScrollHeight;
-                console.log(`[PAGINATION LOG] Page ${page} prepended. Post-prepended measurements -> new scrollHeight: ${chatWindow.scrollHeight}, oldScrollHeight: ${oldScrollHeight}, new scrollTop: ${chatWindow.scrollTop}`);
+                debugLog(`[PAGINATION LOG] Page ${page} prepended. Post-prepended measurements -> new scrollHeight: ${chatWindow.scrollHeight}, oldScrollHeight: ${oldScrollHeight}, new scrollTop: ${chatWindow.scrollTop}`);
             }
 
             if (selectedUserId != null && page === 0) {
                 loadConversations();
             }
         })
-        .catch(error => console.error("[PAGINATION LOG] Error loading messages:", error))
+        .catch(error => {
+            console.error("Error loading messages:", error);
+
+            if (page === 0) {
+                renderChatErrorState(chatWindow);
+                return;
+            }
+
+            removeChatStateElements(chatWindow);
+        })
         .finally(() => {
             isLoadingMessages = false;
-            console.log(`[PAGINATION LOG] Set isLoadingMessages = false`);
+            removeChatLoadingElements(chatWindow);
+            debugLog(`[PAGINATION LOG] Set isLoadingMessages = false`);
         });
 }
 
 function loadMessages() {
-    console.log("LOAD MESSAGES CALLED", new Date());
+    debugLog("LOAD MESSAGES CALLED", new Date());
     currentPage = 0;
     hasMoreMessages = true;
     fetchMessages(0);
@@ -418,7 +576,7 @@ function handleTypingKeydown() {
 
 client.onConnect = () => {
 
-    console.log("CONNECTED", new Date());
+    debugLog("CONNECTED", new Date());
 
     loadMessages();
     loadConversations();
@@ -433,6 +591,7 @@ client.onConnect = () => {
         );
 
         if (existingMessage == null) {
+            removeChatStateElements(div);
             const messageDiv = createMessageElement(messageData);
 
             div.appendChild(messageDiv);
@@ -442,12 +601,12 @@ client.onConnect = () => {
             updateExistingMessageElement(existingMessage, messageData);
         }
 
-        console.log("RECEIVED!", new Date());
+        debugLog("RECEIVED!", new Date());
     });
 
     client.subscribe('/topic/user/'+localStorage.getItem("userId"), function (message){
 
-        console.log(JSON.parse(message.body));
+        debugLog(JSON.parse(message.body));
         const messageData = JSON.parse(message.body);
 
         const myId = parseInt(localStorage.getItem("userId"));
@@ -474,6 +633,7 @@ client.onConnect = () => {
 
             if(existingMessage == null){
 
+                removeChatStateElements(div);
                 const messageDiv = createMessageElement(messageData);
 
                 div.appendChild(messageDiv);
@@ -512,20 +672,28 @@ client.onConnect = () => {
         showTypingPreview(typingData.senderId);
     });
 
-    console.log("Connected!");
+    debugLog("Connected!");
 };
 
-client.onWebSocketClose = () => {
+client.onWebSocketClose = (event) => {
     stopTyping();
-    console.log("WEBSOCKET CLOSED", new Date());
+    debugLog("WEBSOCKET CLOSED", event);
 };
 
 client.onDisconnect = () => {
     stopTyping();
-    console.log("DISCONNECTED", new Date());
+    debugLog("DISCONNECTED", new Date());
 };
 
-client.activate();
+validateStoredSession()
+    .then(function () {
+        document.body.style.visibility = "visible";
+        client.activate();
+    })
+    .catch(function (error) {
+        console.error("Authentication validation failed:", error);
+        redirectToLogin();
+    });
 
 
 const sendButton = document.getElementById("send");
@@ -568,16 +736,35 @@ sendButton.addEventListener("click", function (){
 
 })
 
-console.log(sendButton);
+debugLog(sendButton);
 
 
 const logoutBtn = document.getElementById("logoutBtn");
 logoutBtn.addEventListener("click", function (){
+    if (client != null && client.connected) {
+        client.deactivate();
+    }
+
     localStorage.clear();
     window.location.href = "login.html";
 })
 
 const usersDiv = document.getElementById("users");
+
+function setActiveConversation(partnerId) {
+    document.querySelectorAll(".user.active-conversation").forEach(function (conversationDiv) {
+        conversationDiv.classList.remove("active-conversation");
+    });
+
+    const activeConversation = document.querySelector(
+        `.user[data-partner-id="${partnerId}"]`
+    );
+
+    if (activeConversation != null) {
+        activeConversation.classList.add("active-conversation");
+    }
+}
+
 function formatConversationTime(lastMessageTime) {
     if (lastMessageTime == null) {
         return "";
@@ -597,15 +784,21 @@ function openPrivateConversation(partnerId, partnerUsername) {
     currentPage = 0;
     hasMoreMessages = true;
     clearTypingPreviews();
+    setActiveConversation(partnerId);
 
     fetchMessages(0);
 
-    console.log(selectedUserId);
+    debugLog(selectedUserId);
 }
 
 function createPublicChatElement() {
     const publicDiv = document.createElement("div");
     publicDiv.classList.add("user");
+    publicDiv.dataset.partnerId = "public";
+
+    if (selectedUserId == null) {
+        publicDiv.classList.add("active-conversation");
+    }
 
     publicDiv.textContent = "Public Chat";
     publicDiv.addEventListener("click", function(){
@@ -614,6 +807,7 @@ function createPublicChatElement() {
         selectedUserId = null;
         selectedUserName = null;
         clearTypingPreviews();
+        setActiveConversation("public");
 
         client.publish({
             destination: "/app/leaveChat"
@@ -636,12 +830,17 @@ function createConversationElement(conversation) {
     const previewDiv = document.createElement("div");
 
     conversationDiv.classList.add("user", "conversation");
+    conversationDiv.dataset.partnerId = conversation.partnerId;
     headerDiv.classList.add("conversation-header");
     nameSpan.classList.add("conversation-name");
     statusSpan.classList.add("status-dot");
     timeSpan.classList.add("conversation-time");
     previewDiv.classList.add("conversation-preview");
     previewDiv.dataset.partnerId = conversation.partnerId;
+
+    if (conversation.partnerId === selectedUserId) {
+        conversationDiv.classList.add("active-conversation");
+    }
 
     statusSpan.classList.add(conversation.online ? "online" : "offline");
 
@@ -666,6 +865,12 @@ function createConversationElement(conversation) {
         previewDiv.textContent = conversation.lastMessage;
     }
 
+    if (conversation.lastMessageDeleted) {
+        previewDiv.classList.add("deleted-message");
+    } else {
+        previewDiv.classList.remove("deleted-message");
+    }
+
     if (conversation.unreadCount > 0) {
         const unreadSpan = document.createElement("span");
         unreadSpan.classList.add("unread-count");
@@ -686,11 +891,7 @@ function createConversationElement(conversation) {
 function loadConversations(){
 
     usersDiv.innerHTML = "";
-    fetch('http://localhost:8080/conversations', {
-        headers: {
-            Authorization: `Bearer ${token}`
-        }
-    })
+    authenticatedFetch('/conversations')
     .then(response => response.json())
     .then(conversations =>{
         usersDiv.innerHTML = "<h3>Conversations</h3>";
@@ -700,7 +901,7 @@ function loadConversations(){
             usersDiv.appendChild(createConversationElement(conversation));
         }
     })
-    .catch(error => console.error('Error:', error));
+    .catch(error => console.error("Error loading conversations:", error));
 }
 
 
@@ -723,12 +924,12 @@ function startDeletingMessage(message) {
 
 const messagesContainer = document.getElementById("messages");
 if (messagesContainer) {
-    console.log("[PAGINATION LOG] Attaching scroll event listener to #messages container");
+    debugLog("[PAGINATION LOG] Attaching scroll event listener to #messages container");
     messagesContainer.addEventListener("scroll", function () {
-        console.log(`[PAGINATION LOG] Scroll event fired! scrollTop: ${messagesContainer.scrollTop}, hasMoreMessages: ${hasMoreMessages}, isLoadingMessages: ${isLoadingMessages}, condition (scrollTop <= 30 && hasMoreMessages && !isLoadingMessages): ${messagesContainer.scrollTop <= 30 && hasMoreMessages && !isLoadingMessages}`);
+        debugLog(`[PAGINATION LOG] Scroll event fired! scrollTop: ${messagesContainer.scrollTop}, hasMoreMessages: ${hasMoreMessages}, isLoadingMessages: ${isLoadingMessages}, condition (scrollTop <= 30 && hasMoreMessages && !isLoadingMessages): ${messagesContainer.scrollTop <= 30 && hasMoreMessages && !isLoadingMessages}`);
         
         if (messagesContainer.scrollTop <= 30 && hasMoreMessages && !isLoadingMessages) {
-            console.log(`[PAGINATION LOG] Triggering fetchMessages(page = ${currentPage + 1}) from scroll event!`);
+            debugLog(`[PAGINATION LOG] Triggering fetchMessages(page = ${currentPage + 1}) from scroll event!`);
             fetchMessages(currentPage + 1);
         }
     });
