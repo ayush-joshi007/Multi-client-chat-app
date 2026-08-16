@@ -4,7 +4,6 @@ package com.chatapp.Security;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -14,7 +13,6 @@ import java.util.Date;
 import java.util.function.Function;
 
 @Service
-@Slf4j
 public class JwtService {
 
     @Value("${jwt.secret}")
@@ -23,36 +21,16 @@ public class JwtService {
     private long expiration;
 
     private SecretKey getSigningKey(){
-        if (secret == null || secret.isEmpty()) {
-            log.error("[LOGIN_DEBUG] JWT_SECRET is not set or is empty!");
-            throw new IllegalArgumentException("JWT_SECRET must be configured");
-        }
-        log.debug("[LOGIN_DEBUG] JWT_SECRET is set, length: {}", secret.length());
-        try {
-            SecretKey key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
-            log.debug("[LOGIN_DEBUG] SigningKey created successfully");
-            return key;
-        } catch (Exception e) {
-            log.error("[LOGIN_DEBUG] Failed to create SigningKey - Exception: {}, Message: {}", e.getClass().getSimpleName(), e.getMessage());
-            throw e;
-        }
+        return Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     }
 
     public String generateToken(String userName){
-        log.debug("[LOGIN_DEBUG] JwtService.generateToken() called for username: {}", userName);
-        try {
-            String token = Jwts.builder()
-                    .subject(userName)
-                    .issuedAt(new Date())
-                    .expiration(new Date(System.currentTimeMillis() + expiration))
-                    .signWith(getSigningKey())
-                    .compact();
-            log.debug("[LOGIN_DEBUG] JWT token generated successfully for username: {}", userName);
-            return token;
-        } catch (Exception e) {
-            log.error("[LOGIN_DEBUG] JWT generation failed - Exception: {}, Message: {}", e.getClass().getSimpleName(), e.getMessage());
-            throw e;
-        }
+        return Jwts.builder()
+                .subject(userName)
+                .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + expiration))
+                .signWith(getSigningKey())
+                .compact();
     }
 
     public String extractUserName(String token){

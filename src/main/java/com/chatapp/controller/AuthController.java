@@ -37,16 +37,7 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest loginRequest) {
-        log.info("[LOGIN_DEBUG] AuthController.login() called for username: {}", loginRequest.getUserName());
-
-        try {
-            LoginResponse loginResponse= authService.login(loginRequest);
-            log.info("[LOGIN_DEBUG] AuthController.login() returning successful response for username: {}", loginRequest.getUserName());
-            return ResponseEntity.ok(loginResponse);
-        } catch (Exception e) {
-            log.error("[LOGIN_DEBUG] AuthController.login() caught exception - Exception class: {}, Message: {}", 
-                    e.getClass().getSimpleName(), e.getMessage());
-            throw e;
-        }
+        LoginResponse loginResponse= authService.login(loginRequest);
+        return ResponseEntity.ok(loginResponse);
     }
 }
