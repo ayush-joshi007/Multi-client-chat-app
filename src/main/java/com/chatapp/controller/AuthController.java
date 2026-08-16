@@ -7,6 +7,7 @@ import com.chatapp.entity.UserEntity;
 import com.chatapp.service.AuthService;
 import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -18,6 +19,7 @@ import static org.springframework.http.ResponseEntity.status;
 @AllArgsConstructor
 @RestController
 @RequestMapping("/auth")
+@Slf4j
 public class AuthController {
 
     private AuthService authService;
@@ -35,10 +37,16 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest loginRequest) {
+        log.info("[LOGIN_DEBUG] AuthController.login() called for username: {}", loginRequest.getUserName());
 
-        LoginResponse loginResponse= authService.login(loginRequest);
-
-        return ResponseEntity.ok(loginResponse);
-
+        try {
+            LoginResponse loginResponse= authService.login(loginRequest);
+            log.info("[LOGIN_DEBUG] AuthController.login() returning successful response for username: {}", loginRequest.getUserName());
+            return ResponseEntity.ok(loginResponse);
+        } catch (Exception e) {
+            log.error("[LOGIN_DEBUG] AuthController.login() caught exception - Exception class: {}, Message: {}", 
+                    e.getClass().getSimpleName(), e.getMessage());
+            throw e;
+        }
     }
 }

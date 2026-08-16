@@ -2,6 +2,7 @@ package com.chatapp.config;
 
 import com.chatapp.Security.JwtAuthenticationFilter;
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -17,36 +18,41 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 
 @AllArgsConstructor
 @Configuration
+@Slf4j
 public class SecurityConfig {
 
     private JwtAuthenticationFilter jwtAuthenticationFilter;
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http, DaoAuthenticationProvider daoAuthenticationProvider) throws Exception {
+        log.info("[LOGIN_DEBUG] SecurityConfig.securityFilterChain() - Setting up security filter chain");
         http
+                .authenticationProvider(daoAuthenticationProvider)
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(
-                                "/index.html",
-                                "/",
-                                "/ws/**",
-                                "/login.html",
-                                "/register.html",
-                                "/app.js",
-                                "/style.css",
-                                "/auth/**",
-                                "/favicon.ico",
-                                "/relay-main.png"
-                        ).permitAll()
-                        .anyRequest().authenticated()
-                )
+                .authorizeHttpRequests(auth -> {
+                    log.info("[LOGIN_DEBUG] Configuring authorized requests - /auth/** is permitAll");
+                    auth.requestMatchers(
+                            "/index.html",
+                            "/",
+                            "/ws/**",
+                            "/login.html",
+                            "/register.html",
+                            "/app.js",
+                            "/style.css",
+                            "/auth/**",
+                            "/favicon.ico",
+                            "/relay-main.png"
+                    ).permitAll()
+                    .anyRequest().authenticated();
+                })
                 .addFilterBefore(
                         jwtAuthenticationFilter,
                         UsernamePasswordAuthenticationFilter.class
                 );
 
+        log.info("[LOGIN_DEBUG] SecurityConfig.securityFilterChain() - Filter chain setup complete");
         return http.build();
     }
 
@@ -56,8 +62,11 @@ public class SecurityConfig {
     }
 
     @Bean
-    public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception{
-        return config.getAuthenticationManager();
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
+        log.info("[LOGIN_DEBUG] SecurityConfig.authenticationManager() - Creating AuthenticationManager");
+        AuthenticationManager manager = config.getAuthenticationManager();
+        log.info("[LOGIN_DEBUG] SecurityConfig.authenticationManager() - AuthenticationManager created successfully");
+        return manager;
     }
 
     @Bean
